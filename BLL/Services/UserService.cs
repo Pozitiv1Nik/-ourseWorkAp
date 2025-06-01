@@ -77,5 +77,17 @@ namespace BLL.Services
 			_unitOfWork.Users.Remove(user);
 			await _unitOfWork.CompleteAsync();
 		}
-	}
+        // Додайте цей метод до класу UserService в файлі UserService.cs
+
+        public async Task<UserDTO> GetByUsernameAsync(string username)
+        {
+            var users = await _unitOfWork.Users.FindAsync(u => u.UserName == username);
+            var user = users.FirstOrDefault();
+
+            if (user == null)
+                throw new KeyNotFoundException("User not found");
+
+            return _mapper.Map<UserDTO>(user);
+        }
+    }
 }

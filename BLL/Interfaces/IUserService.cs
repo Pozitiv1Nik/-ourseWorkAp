@@ -14,5 +14,6 @@ namespace BLL.Interfaces
 		Task<UserDTO> AuthenticateAsync(string username, string password);
 		Task UpdateUserAsync(UserDTO userDTO);
 		Task DeleteUserAsync(int id);
-	}
+        Task<UserDTO> GetByUsernameAsync(string username);
+    }
 }

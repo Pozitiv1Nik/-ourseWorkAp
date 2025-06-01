@@ -46,8 +46,7 @@ builder.Services.AddCors(options =>
 
 // DB (🔁 заміни рядок підключення на свій у appsettings.json)
 builder.Services.AddDbContext<ApDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 // JWT Auth
 var key = Encoding.UTF8.GetBytes("your_super_secret_key_123456"); // заміни на свій ключ!
 builder.Services.AddAuthentication(options =>

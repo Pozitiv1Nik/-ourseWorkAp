@@ -22,7 +22,10 @@ namespace DAL
 				optionsBuilder.UseSqlServer(@"Server=localhost;Database=BulletinBoardDb;Trusted_Connection=True;TrustServerCertificate=True;");
 			}
 		}
-		public ApDbContext(DbContextOptions<ApDbContext> options) : base(options) { }
+        public ApDbContext(DbContextOptions<ApDbContext> options)
+        : base(options)
+        {
+        }
 
-	}
+    }
 }

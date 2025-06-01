@@ -6,7 +6,7 @@ using System.Security.Claims;
 
 namespace Presentation.Controllers
 {
-    [Route("api/resumevacancylink")]
+    [Route("api/[controller]")]
     [ApiController]
     [Authorize]
     public class ResumeVacancyLinkController : ControllerBase
@@ -84,7 +84,7 @@ namespace Presentation.Controllers
 
         // POST: api/resumevacancylink/apply - працівник подає резюме на вакансію
         [HttpPost("apply")]
-        public async Task<IActionResult> ApplyResumeToVacancy([FromBody] ApplyRequest request)
+        public async Task<IActionResult> ApplyResumeToVacancy([FromBody] ApplyResumeRequest request)
         {
             try
             {
@@ -117,7 +117,7 @@ namespace Presentation.Controllers
 
         // POST: api/resumevacancylink/offer - роботодавець пропонує вакансію по резюме
         [HttpPost("offer")]
-        public async Task<IActionResult> OfferVacancyToResume([FromBody] OfferRequest request)
+        public async Task<IActionResult> OfferVacancyToResume([FromBody] OfferVacancyRequest request)
         {
             try
             {
@@ -253,7 +253,6 @@ namespace Presentation.Controllers
                     return Forbid("Only workers can view their applications.");
                 }
 
-                // Отримуємо всі резюме користувача та їх зв'язки
                 var userResumes = await _resumeService.GetAllResumesAsync(user);
                 var allApplications = new List<ResumeVacancyLinkDTO>();
 
@@ -271,9 +270,9 @@ namespace Presentation.Controllers
             }
         }
 
-        // GET: api/resumevacancylink/my-offers - мої пропозиції (для роботодавців)
-        [HttpGet("my-offers")]
-        public async Task<IActionResult> GetMyOffers()
+        // GET: api/resumevacancylink/received-applications - отримані заявки (для роботодавців)
+        [HttpGet("received-applications")]
+        public async Task<IActionResult> GetReceivedApplications()
         {
             try
             {
@@ -281,36 +280,129 @@ namespace Presentation.Controllers
 
                 if (user.Role != Domain.Entities.UserRole.Employer)
                 {
-                    return Forbid("Only employers can view their offers.");
+                    return Forbid("Only employers can view received applications.");
                 }
 
-                // Отримуємо всі вакансії користувача та їх зв'язки
                 var userVacancies = await _vacancyService.GetVacanciesByEmployerAsync(user.Id);
-                var allOffers = new List<ResumeVacancyLinkDTO>();
+                var allApplications = new List<ResumeVacancyLinkDTO>();
 
                 foreach (var vacancy in userVacancies)
                 {
                     var vacancyLinks = await _linkService.GetLinksByVacancyAsync(vacancy.Id, user);
-                    allOffers.AddRange(vacancyLinks);
+                    allApplications.AddRange(vacancyLinks);
                 }
 
-                return Ok(allOffers);
+                return Ok(allApplications);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
+
+        // GET: api/resumevacancylink/dashboard - дашборд для всіх ролей
+        [HttpGet("dashboard")]
+        public async Task<IActionResult> GetDashboard()
+        {
+            try
+            {
+                var user = await GetCurrentUserAsync();
+                object dashboardData;
+
+                switch (user.Role)
+                {
+                    case Domain.Entities.UserRole.Admin:
+                        var allLinks = await _linkService.GetAllLinksAsync(user);
+                        dashboardData = new
+                        {
+                            Role = "Admin",
+                            TotalLinks = allLinks.Count(),
+                            RecentLinks = allLinks.OrderByDescending(l => l.SubmittedAt).Take(10),
+                            Stats = new
+                            {
+                                ApplicationsToday = allLinks.Count(l => l.SubmittedAt.Date == DateTime.Today),
+                                ApplicationsThisWeek = allLinks.Count(l => l.SubmittedAt >= DateTime.Today.AddDays(-7))
+                            }
+                        };
+                        break;
+
+                    case Domain.Entities.UserRole.Worker:
+                        var myApplications = await GetMyApplicationsData(user);
+                        dashboardData = new
+                        {
+                            Role = "Worker",
+                            MyApplications = myApplications.Count,
+                            RecentApplications = myApplications.OrderByDescending(l => l.SubmittedAt).Take(5),
+                            Stats = new
+                            {
+                                ApplicationsThisMonth = myApplications.Count(l => l.SubmittedAt.Month == DateTime.Now.Month)
+                            }
+                        };
+                        break;
+
+                    case Domain.Entities.UserRole.Employer:
+                        var receivedApplications = await GetReceivedApplicationsData(user);
+                        dashboardData = new
+                        {
+                            Role = "Employer",
+                            ReceivedApplications = receivedApplications.Count,
+                            RecentApplications = receivedApplications.OrderByDescending(l => l.SubmittedAt).Take(5),
+                            Stats = new
+                            {
+                                NewApplicationsToday = receivedApplications.Count(l => l.SubmittedAt.Date == DateTime.Today)
+                            }
+                        };
+                        break;
+
+                    default:
+                        return Forbid("Invalid user role");
+                }
+
+                return Ok(dashboardData);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        private async Task<List<ResumeVacancyLinkDTO>> GetMyApplicationsData(UserDTO user)
+        {
+            var userResumes = await _resumeService.GetAllResumesAsync(user);
+            var allApplications = new List<ResumeVacancyLinkDTO>();
+
+            foreach (var resume in userResumes)
+            {
+                var resumeLinks = await _linkService.GetLinksByResumeAsync(resume.Id, user);
+                allApplications.AddRange(resumeLinks);
+            }
+
+            return allApplications;
+        }
+
+        private async Task<List<ResumeVacancyLinkDTO>> GetReceivedApplicationsData(UserDTO user)
+        {
+            var userVacancies = await _vacancyService.GetVacanciesByEmployerAsync(user.Id);
+            var allApplications = new List<ResumeVacancyLinkDTO>();
+
+            foreach (var vacancy in userVacancies)
+            {
+                var vacancyLinks = await _linkService.GetLinksByVacancyAsync(vacancy.Id, user);
+                allApplications.AddRange(vacancyLinks);
+            }
+
+            return allApplications;
+        }
     }
 
     // DTOs for requests
-    public class ApplyRequest
+    public class ApplyResumeRequest
     {
         public int ResumeId { get; set; }
         public int VacancyId { get; set; }
     }
 
-    public class OfferRequest
+    public class OfferVacancyRequest
     {
         public int VacancyId { get; set; }
         public int ResumeId { get; set; }

@@ -3,6 +3,7 @@ using BLL.DTO;
 using BLL.Interfaces;
 using DAL;
 using Domain.Entities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,64 +21,61 @@ namespace BLL.Services
 			_mapper = mapper;
 		}
 
-		public async Task<UserDTO> GetByUsernameAsync(string username)
-		{
-			var user = await _unitOfWork.Users.GetByUsernameAsync(username);
-			if (user == null) return null;
-			return _mapper.Map<UserDTO>(user);
-		}
-
-		public async Task<UserDTO> GetUserByIdAsync(int id)
-		{
-			var user = await _unitOfWork.Users.GetByIdAsync(id);
-			if (user == null) return null;
-			return _mapper.Map<UserDTO>(user);
-		}
-
 		public async Task<IEnumerable<UserDTO>> GetAllUsersAsync()
 		{
 			var users = await _unitOfWork.Users.GetAllAsync();
 			return users.Select(u => _mapper.Map<UserDTO>(u));
 		}
 
-		public async Task AddUserAsync(UserDTO dto, string password)
+		public async Task<UserDTO> GetUserByIdAsync(int id)
 		{
-			var user = _mapper.Map<User>(dto);
-			user.Password = password;
+			var user = await _unitOfWork.Users.GetByIdAsync(id);
+			if (user == null)
+				throw new KeyNotFoundException("User not found");
+			return _mapper.Map<UserDTO>(user);
+		}
 
+		public async Task AddUserAsync(UserDTO userDTO, string password)
+		{
+			var existing = await _unitOfWork.Users.FindAsync(u => u.UserName == userDTO.UserName);
+			if (existing.Any())
+				throw new InvalidOperationException("Username already exists");
+
+			var user = _mapper.Map<User>(userDTO);
+			user.Password = password;
 			await _unitOfWork.Users.AddAsync(user);
 			await _unitOfWork.CompleteAsync();
 		}
 
-		public async Task UpdateUserAsync(UserDTO dto)
+		public async Task<UserDTO> AuthenticateAsync(string username, string password)
 		{
-			var existingUser = await _unitOfWork.Users.GetByIdAsync(dto.Id);
-			if (existingUser == null) throw new KeyNotFoundException("User not found");
+			var users = await _unitOfWork.Users.FindAsync(u => u.UserName == username);
+			var user = users.FirstOrDefault();
+			if (user == null || user.Password != password)
+				throw new UnauthorizedAccessException("Invalid username or password");
 
-			_mapper.Map(dto, existingUser);
+			return _mapper.Map<UserDTO>(user);
+		}
 
-			_unitOfWork.Users.Update(existingUser);
+		public async Task UpdateUserAsync(UserDTO userDTO)
+		{
+			var existing = await _unitOfWork.Users.GetByIdAsync(userDTO.Id);
+			if (existing == null)
+				throw new KeyNotFoundException("User not found");
+
+			_mapper.Map(userDTO, existing);
+			_unitOfWork.Users.Update(existing);
 			await _unitOfWork.CompleteAsync();
 		}
 
 		public async Task DeleteUserAsync(int id)
 		{
 			var user = await _unitOfWork.Users.GetByIdAsync(id);
-			if (user == null) throw new KeyNotFoundException("User not found");
+			if (user == null)
+				throw new KeyNotFoundException("User not found");
 
 			_unitOfWork.Users.Remove(user);
 			await _unitOfWork.CompleteAsync();
-		}
-
-		public async Task<UserDTO> AuthenticateAsync(string username, string password)
-		{
-			var user = await _unitOfWork.Users.GetByUsernameAsync(username);
-			if (user == null) return null;
-
-			if (user.Password == password)
-				return _mapper.Map<UserDTO>(user);
-
-			return null;
 		}
 	}
 }

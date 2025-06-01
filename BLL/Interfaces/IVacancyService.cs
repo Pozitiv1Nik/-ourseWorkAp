@@ -13,5 +13,6 @@ namespace BLL.Interfaces
 		Task AddVacancyAsync(VacancyDTO vacancyDTO);
 		Task UpdateVacancyAsync(VacancyDTO vacancyDTO);
 		Task DeleteVacancyAsync(int id);
+		Task<IEnumerable<VacancyDTO>> SearchVacanciesAsync(string keyword);
 	}
 }

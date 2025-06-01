@@ -3,6 +3,7 @@ using BLL.DTO;
 using BLL.Interfaces;
 using DAL;
 using Domain.Entities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,7 +30,8 @@ namespace BLL.Services
 		public async Task<VacancyDTO> GetVacancyByIdAsync(int id)
 		{
 			var vacancy = await _unitOfWork.Vacancies.GetByIdAsync(id);
-			if (vacancy == null) return null;
+			if (vacancy == null)
+				throw new KeyNotFoundException("Vacancy not found");
 			return _mapper.Map<VacancyDTO>(vacancy);
 		}
 
@@ -42,21 +44,35 @@ namespace BLL.Services
 
 		public async Task UpdateVacancyAsync(VacancyDTO vacancyDTO)
 		{
-			var existingVacancy = await _unitOfWork.Vacancies.GetByIdAsync(vacancyDTO.Id);
-			if (existingVacancy == null) throw new KeyNotFoundException("Vacancy not found");
+			var existing = await _unitOfWork.Vacancies.GetByIdAsync(vacancyDTO.Id);
+			if (existing == null)
+				throw new KeyNotFoundException("Vacancy not found");
 
-			_mapper.Map(vacancyDTO, existingVacancy);
-			_unitOfWork.Vacancies.Update(existingVacancy);
+			_mapper.Map(vacancyDTO, existing);
+			_unitOfWork.Vacancies.Update(existing);
 			await _unitOfWork.CompleteAsync();
 		}
 
 		public async Task DeleteVacancyAsync(int id)
 		{
 			var vacancy = await _unitOfWork.Vacancies.GetByIdAsync(id);
-			if (vacancy == null) throw new KeyNotFoundException("Vacancy not found");
+			if (vacancy == null)
+				throw new KeyNotFoundException("Vacancy not found");
 
 			_unitOfWork.Vacancies.Remove(vacancy);
 			await _unitOfWork.CompleteAsync();
+		}
+		public async Task<IEnumerable<VacancyDTO>> SearchVacanciesAsync(string keyword)
+		{
+			if (string.IsNullOrWhiteSpace(keyword))
+			{
+				var allVacancies = await _unitOfWork.Vacancies.GetAllAsync();
+				return allVacancies.Select(v => _mapper.Map<VacancyDTO>(v));
+			}
+			var filtered = await _unitOfWork.Vacancies.FindAsync(v =>
+				v.Title.Contains(keyword) || v.Description.Contains(keyword));
+
+			return filtered.Select(v => _mapper.Map<VacancyDTO>(v));
 		}
 	}
 }

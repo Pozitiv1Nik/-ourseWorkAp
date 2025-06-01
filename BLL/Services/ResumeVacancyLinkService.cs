@@ -3,6 +3,7 @@ using BLL.DTO;
 using BLL.Interfaces;
 using DAL;
 using Domain.Entities;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -22,23 +23,24 @@ namespace BLL.Services
 		public async Task<IEnumerable<ResumeVacancyLinkDTO>> GetAllLinksAsync()
 		{
 			var links = await _unitOfWork.ResumeVacancyLinks.GetAllAsync();
-			return _mapper.Map<IEnumerable<ResumeVacancyLinkDTO>>(links);
+			return links.Select(l => _mapper.Map<ResumeVacancyLinkDTO>(l));
 		}
 
 		public async Task AddLinkAsync(ResumeVacancyLinkDTO linkDTO)
 		{
-			var entity = _mapper.Map<ResumeVacancyLink>(linkDTO);
-			await _unitOfWork.ResumeVacancyLinks.AddAsync(entity);
+			var link = _mapper.Map<ResumeVacancyLink>(linkDTO);
+			link.SubmittedAt = DateTime.UtcNow;
+			await _unitOfWork.ResumeVacancyLinks.AddAsync(link);
 			await _unitOfWork.CompleteAsync();
 		}
 
 		public async Task DeleteLinkAsync(int id)
 		{
-			var entity = await _unitOfWork.ResumeVacancyLinks.GetByIdAsync(id);
-			if (entity == null)
+			var link = await _unitOfWork.ResumeVacancyLinks.GetByIdAsync(id);
+			if (link == null)
 				throw new KeyNotFoundException("Link not found");
 
-			_unitOfWork.ResumeVacancyLinks.Remove(entity);
+			_unitOfWork.ResumeVacancyLinks.Remove(link);
 			await _unitOfWork.CompleteAsync();
 		}
 	}

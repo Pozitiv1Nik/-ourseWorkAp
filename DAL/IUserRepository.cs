@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Domain.Entities;
 namespace DAL
 	{
-	public interface IUserRepository : IRepository<User>
+	public interface IAppUserRepository : IRepository<AppUser>
 	{
-		Task<User> GetByUsernameAsync(string username);
-		Task<IEnumerable<User>> FindAsync(Expression<Func<User, bool>> predicate);
+		Task<AppUser> GetByAppUsernameAsync(string username);
+		Task<IEnumerable<AppUser>> FindAsync(Expression<Func<AppUser, bool>> predicate);
 	}
 }

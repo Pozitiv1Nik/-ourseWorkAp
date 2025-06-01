@@ -8,17 +8,17 @@ using System.Text;
 using System.Threading.Tasks;
 namespace DAL
 {
-	public class UserRepository : GenericRepository<User>, IUserRepository
+	public class AppUserRepository : GenericRepository<AppUser>, IAppUserRepository
 	{
-		public UserRepository(ApDbContext context) : base(context) { }
+		public AppUserRepository(ApDbContext context) : base(context) { }
 
-		public async Task<User> GetByUsernameAsync(string username)
+		public async Task<AppUser> GetByAppUsernameAsync(string username)
 		{
-			return await _context.Users.FirstOrDefaultAsync(u => u.UserName == username);
+			return await _context.AppUsers.FirstOrDefaultAsync(u => u.AppUserName == username);
 		}
-		public async Task<IEnumerable<User>> FindAsync(Expression<Func<User, bool>> predicate)
+		public async Task<IEnumerable<AppUser>> FindAsync(Expression<Func<AppUser, bool>> predicate)
 		{
-			return await _context.Users.Where(predicate).ToListAsync();
+			return await _context.AppUsers.Where(predicate).ToListAsync();
 		}
 	}
 

@@ -14,7 +14,7 @@ namespace BLL
 	{
 		public MappingProfile()
 		{
-			CreateMap<User, UserDTO>().ReverseMap();
+			CreateMap<AppUser, AppUserDTO>().ReverseMap();
 			CreateMap<Resume, ResumeDTO>().ReverseMap();
 			CreateMap<Vacancy, VacancyDTO>().ReverseMap();
 			CreateMap<ResumeVacancyLink, ResumeVacancyLinkDTO>().ReverseMap();

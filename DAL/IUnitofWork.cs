@@ -11,7 +11,7 @@ namespace DAL
 		IResumeRepository Resumes { get; }
 		IVacancyRepository Vacancies { get; }
 		IResumeVacancyLinkRepository ResumeVacancyLinks { get; }
-		IUserRepository Users { get; }
+		IAppUserRepository AppUsers { get; }
 		Task<int> CompleteAsync();
 	}
 }

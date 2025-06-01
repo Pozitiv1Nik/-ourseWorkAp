@@ -10,71 +10,71 @@ using System.Threading.Tasks;
 
 namespace BLL.Services
 {
-	public class UserService : IUserService
+	public class AppUserService : IAppUserService
 	{
 		private readonly IUnitOfWork _unitOfWork;
 		private readonly IMapper _mapper;
 
-		public UserService(IUnitOfWork unitOfWork, IMapper mapper)
+		public AppUserService(IUnitOfWork unitOfWork, IMapper mapper)
 		{
 			_unitOfWork = unitOfWork;
 			_mapper = mapper;
 		}
 
-		public async Task<IEnumerable<UserDTO>> GetAllUsersAsync()
+		public async Task<IEnumerable<AppUserDTO>> GetAllAppUsersAsync()
 		{
-			var users = await _unitOfWork.Users.GetAllAsync();
-			return users.Select(u => _mapper.Map<UserDTO>(u));
+			var users = await _unitOfWork.AppUsers.GetAllAsync();
+			return users.Select(u => _mapper.Map<AppUserDTO>(u));
 		}
 
-		public async Task<UserDTO> GetUserByIdAsync(int id)
+		public async Task<AppUserDTO> GetAppUserByIdAsync(int id)
 		{
-			var user = await _unitOfWork.Users.GetByIdAsync(id);
+			var user = await _unitOfWork.AppUsers.GetByIdAsync(id);
 			if (user == null)
-				throw new KeyNotFoundException("User not found");
-			return _mapper.Map<UserDTO>(user);
+				throw new KeyNotFoundException("AppUser not found");
+			return _mapper.Map<AppUserDTO>(user);
 		}
 
-		public async Task AddUserAsync(UserDTO userDTO, string password)
+		public async Task AddAppUserAsync(AppUserDTO userDTO, string password)
 		{
-			var existing = await _unitOfWork.Users.FindAsync(u => u.UserName == userDTO.UserName);
+			var existing = await _unitOfWork.AppUsers.FindAsync(u => u.AppUserName == userDTO.AppUserName);
 			if (existing.Any())
-				throw new InvalidOperationException("Username already exists");
+				throw new InvalidOperationException("AppUsername already exists");
 
-			var user = _mapper.Map<User>(userDTO);
+			var user = _mapper.Map<AppUser>(userDTO);
 			user.Password = password;
-			await _unitOfWork.Users.AddAsync(user);
+			await _unitOfWork.AppUsers.AddAsync(user);
 			await _unitOfWork.CompleteAsync();
 		}
 
-		public async Task<UserDTO> AuthenticateAsync(string username, string password)
+		public async Task<AppUserDTO> AuthenticateAsync(string username, string password)
 		{
-			var users = await _unitOfWork.Users.FindAsync(u => u.UserName == username);
+			var users = await _unitOfWork.AppUsers.FindAsync(u => u.AppUserName == username);
 			var user = users.FirstOrDefault();
 			if (user == null || user.Password != password)
 				throw new UnauthorizedAccessException("Invalid username or password");
 
-			return _mapper.Map<UserDTO>(user);
+			return _mapper.Map<AppUserDTO>(user);
 		}
 
-		public async Task UpdateUserAsync(UserDTO userDTO)
+		public async Task UpdateAppUserAsync(AppUserDTO userDTO)
 		{
-			var existing = await _unitOfWork.Users.GetByIdAsync(userDTO.Id);
+			var existing = await _unitOfWork.AppUsers.GetByIdAsync(userDTO.Id);
 			if (existing == null)
-				throw new KeyNotFoundException("User not found");
+				throw new KeyNotFoundException("AppUser not found");
 
 			_mapper.Map(userDTO, existing);
-			_unitOfWork.Users.Update(existing);
+			_unitOfWork.AppUsers.Update(existing);
 			await _unitOfWork.CompleteAsync();
 		}
 
-		public async Task DeleteUserAsync(int id)
+		public async Task DeleteAppUserAsync(int id)
 		{
-			var user = await _unitOfWork.Users.GetByIdAsync(id);
+			var user = await _unitOfWork.AppUsers.GetByIdAsync(id);
 			if (user == null)
-				throw new KeyNotFoundException("User not found");
+				throw new KeyNotFoundException("AppUser not found");
 
-			_unitOfWork.Users.Remove(user);
+			_unitOfWork.AppUsers.Remove(user);
 			await _unitOfWork.CompleteAsync();
 		}
 	}

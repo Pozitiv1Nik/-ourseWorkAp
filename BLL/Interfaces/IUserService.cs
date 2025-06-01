@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 using BLL.DTO;
 namespace BLL.Interfaces
 {
-	public interface IUserService
+	public interface IAppUserService
 	{
-		Task<IEnumerable<UserDTO>> GetAllUsersAsync();
-		Task<UserDTO> GetUserByIdAsync(int id);
-		Task AddUserAsync(UserDTO userDTO, string password);
-		Task<UserDTO> AuthenticateAsync(string username, string password);
-		Task UpdateUserAsync(UserDTO userDTO);
-		Task DeleteUserAsync(int id);
+		Task<IEnumerable<AppUserDTO>> GetAllAppUsersAsync();
+		Task<AppUserDTO> GetAppUserByIdAsync(int id);
+		Task AddAppUserAsync(AppUserDTO userDTO, string password);
+		Task<AppUserDTO> AuthenticateAsync(string username, string password);
+		Task UpdateAppUserAsync(AppUserDTO userDTO);
+		Task DeleteAppUserAsync(int id);
 	}
 }

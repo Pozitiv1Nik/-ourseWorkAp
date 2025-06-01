@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace BLL.DTO
 {
-	public class UserDTO
+	public class AppUserDTO
 	{
 		public int Id { get; set; }
-		public string UserName { get; set; }
-		public UserRole Role { get; set; }
+		public string AppUserName { get; set; }
+		public AppUserRole Role { get; set; }
 	}
 }

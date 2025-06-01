@@ -9,10 +9,10 @@ namespace BLL.Interfaces
 {
     public interface IResumeService
     {
-		Task<IEnumerable<ResumeDTO>> GetAllResumesAsync(UserDTO requester);
-		Task<ResumeDTO> GetResumeByIdAsync(int id, UserDTO requester);
-		Task AddResumeAsync(ResumeDTO resumeDTO, UserDTO requester);
-		Task UpdateResumeAsync(ResumeDTO resumeDTO, UserDTO requester);
-		Task DeleteResumeAsync(int id, UserDTO requester);
+		Task<IEnumerable<ResumeDTO>> GetAllResumesAsync(AppUserDTO requester);
+		Task<ResumeDTO> GetResumeByIdAsync(int id, AppUserDTO requester);
+		Task AddResumeAsync(ResumeDTO resumeDTO, AppUserDTO requester);
+		Task UpdateResumeAsync(ResumeDTO resumeDTO, AppUserDTO requester);
+		Task DeleteResumeAsync(int id, AppUserDTO requester);
 	}
 }

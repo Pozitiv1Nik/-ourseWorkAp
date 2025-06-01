@@ -5,4 +5,4 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Domain.Entities
-{public enum UserRole { Admin, Employer, Worker }}
+{public enum AppUserRole { Admin, Employer, Worker }}

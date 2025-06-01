@@ -13,7 +13,7 @@ namespace DAL
 		public IResumeRepository Resumes { get; }
 		public IVacancyRepository Vacancies { get; }
 		public IResumeVacancyLinkRepository ResumeVacancyLinks { get; }
-		public IUserRepository Users { get; }
+		public IAppUserRepository AppUsers { get; }
 
 		public UnitOfWork(ApDbContext context)
 		{
@@ -21,7 +21,7 @@ namespace DAL
 			Resumes = new ResumeRepository(context);
 			Vacancies = new VacancyRepository(context);
 			ResumeVacancyLinks = new ResumeVacancyLinkRepository(context);
-			Users = new UserRepository(context);
+			AppUsers = new AppUserRepository(context);
 		}
 
 		public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();

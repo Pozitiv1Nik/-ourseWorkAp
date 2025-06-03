@@ -1,0 +1,641 @@
+﻿@page "/vacancies"
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using BLL.DTO
+@using System.Text
+
+<PageTitle>Всі вакансії</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary">Всі вакансії</h2>
+        @if (currentUser?.Role == 1) // Employer
+        {
+            <button class="btn btn-primary" @onclick="NavigateToCreateVacancy">
+                <i class="bi bi-plus-circle"></i> Додати вакансію
+            </button>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Завантаження...</span>
+            </div>
+            <p class="mt-3 text-muted">Завантаження вакансій...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            @errorMessage
+        </div>
+    }
+    else if (vacancies == null || !vacancies.Any())
+    {
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="bi bi-briefcase" style="font-size: 4rem; color: #6c757d;"></i>
+            </div>
+            <h4 class="text-muted mb-3">Наразі немає доступних вакансій</h4>
+            <p class="text-muted mb-4">Перевірте пізніше або створіть власну вакансію</p>
+            @if (currentUser?.Role == 1) // Employer
+            {
+                <button class="btn btn-primary btn-lg" @onclick="NavigateToCreateVacancy">
+                    <i class="bi bi-plus-circle"></i> Створити вакансію
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Search bar -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Пошук вакансій за ключовими словами..."
+                           @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
+                    <button class="btn btn-outline-secondary" type="button" @onclick="SearchVacancies">
+                        <i class="bi bi-search"></i> Пошук
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-outline-primary w-100" @onclick="RefreshVacancies">
+                    <i class="bi bi-arrow-clockwise"></i> Оновити
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            @foreach (var vacancy in vacancies)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-briefcase-fill"></i>
+                                @vacancy.Title
+                            </h5>
+                            <small class="text-light">
+                                <i class="bi bi-building"></i> @vacancy.Company
+                            </small>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <p class="card-text text-muted mb-3">
+                                @(vacancy.Description.Length > 120 ? vacancy.Description.Substring(0, 120) + "..." : vacancy.Description)
+                            </p>
+
+                            @if (!string.IsNullOrEmpty(vacancy.Requirements))
+                            {
+                                <div class="mb-3">
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-list-check"></i> Вимоги:
+                                    </small>
+                                    <span class="badge bg-light text-dark">
+                                        @(vacancy.Requirements.Length > 50 ? vacancy.Requirements.Substring(0, 50) + "..." : vacancy.Requirements)
+                                    </span>
+                                </div>
+                            }
+
+                            @if (vacancy.Salary > 0)
+                            {
+                                <div class="mb-auto">
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-currency-dollar"></i> Зарплата:
+                                    </small>
+                                    <span class="fw-bold text-success">
+                                        @vacancy.Salary.ToString("N0") грн
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-footer bg-transparent border-0">
+                            <div class="d-grid gap-2">
+                                @if (currentUser?.Role == 2) // Worker
+                                {
+                                    <button class="btn btn-primary" @onclick="() => ShowApplyModal(vacancy)"
+                                            disabled="@(appliedVacancies.Contains(vacancy.Id))">
+                                        @if (appliedVacancies.Contains(vacancy.Id))
+                                        {
+                                            <i class="bi bi-check-circle"></i> <text>Вже подано</text>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send"></i> <text>Відгукнутися</text>
+                                        }
+                                    </button>
+                                }
+                                else if (currentUser?.Role == 1) // Employer
+                                {
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => EditVacancy(vacancy.Id)">
+                                            <i class="bi bi-pencil"></i> Редагувати
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm flex-fill" @onclick="() => DeleteVacancy(vacancy.Id)">
+                                            <i class="bi bi-trash"></i> Видалити
+                                        </button>
+                                    </div>
+                                }
+                                <button class="btn btn-outline-info btn-sm" @onclick="() => ViewVacancyDetails(vacancy)">
+                                    <i class="bi bi-eye"></i> Детальніше
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="mt-4 p-3 bg-light rounded">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="mb-1">Загалом вакансій: <span class="badge bg-success">@vacancies.Count</span></h6>
+                    <small class="text-muted">Регулярно перевіряйте нові вакансії для кращих можливостей</small>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <button class="btn btn-outline-success" @onclick="RefreshVacancies">
+                        <i class="bi bi-arrow-clockwise"></i> Оновити
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад на головну
+        </a>
+    </div>
+</div>
+
+<!-- Apply Modal -->
+@if (showApplyModal && selectedVacancy != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Відгукнутися на вакансію</h5>
+                    <button type="button" class="btn-close" @onclick="CloseApplyModal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Вакансія: @selectedVacancy.Title</h6>
+                    <p class="text-muted">@selectedVacancy.Company</p>
+
+                    @if (userResumes == null)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Завантаження резюме...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (!userResumes.Any())
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            У вас немає резюме. Спочатку створіть резюме, щоб відгукнутися на вакансію.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Оберіть резюме для подачі:</label>
+                            <select class="form-select" @bind="selectedResumeId">
+                                <option value="0">-- Оберіть резюме --</option>
+                                @foreach (var resume in userResumes)
+                                {
+                                    <option value="@resume.Id">@resume.Title</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseApplyModal">Скасувати</button>
+                    @if (userResumes?.Any() == true)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="ApplyToVacancy"
+                                disabled="@(selectedResumeId <= 0 || isApplying)">
+                            @if (isApplying)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <i class="bi bi-send"></i> Відгукнутися
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="NavigateToCreateResume">
+                            <i class="bi bi-plus-circle"></i> Створити резюме
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Vacancy Details Modal -->
+@if (showDetailsModal && selectedVacancy != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@selectedVacancy.Title</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDetailsModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Компанія:</strong> @selectedVacancy.Company</p>
+                            @if (selectedVacancy.Salary > 0)
+                            {
+                                <p><strong>Зарплата:</strong> @selectedVacancy.Salary.ToString("N0") грн</p>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Розміщено:</strong> @selectedVacancy.PostedAt.ToString("dd.MM.yyyy")</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <h6>Опис вакансії:</h6>
+                        <p>@selectedVacancy.Description</p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedVacancy.Requirements))
+                    {
+                        <div class="mt-3">
+                            <h6>Вимоги:</h6>
+                            <p>@selectedVacancy.Requirements</p>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDetailsModal">Закрити</button>
+                    @if (currentUser?.Role == 2) // Worker
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="() => { CloseDetailsModal(); ShowApplyModal(selectedVacancy); }"
+                                disabled="@(appliedVacancies.Contains(selectedVacancy.Id))">
+                            @if (appliedVacancies.Contains(selectedVacancy.Id))
+                            {
+                                <i class="bi bi-check-circle"></i> <text>Вже подано</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send"></i> <text>Відгукнутися</text>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<VacancyDTO>? vacancies = null;
+    private List<ResumeDTO>? userResumes = null;
+    private HashSet<int> appliedVacancies = new HashSet<int>();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private UserDTO? currentUser = null;
+    private string searchKeyword = string.Empty;
+
+    // Modal state
+    private bool showApplyModal = false;
+    private bool showDetailsModal = false;
+    private VacancyDTO? selectedVacancy = null;
+    private int selectedResumeId = 0;
+    private bool isApplying = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUser();
+            if (currentUser != null)
+            {
+                await LoadVacancies();
+                await LoadAppliedVacancies();
+            }
+            else
+            {
+                Navigation.NavigateTo("/auth");
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await Http.GetAsync("api/auth/me");
+                if (response.IsSuccessStatusCode)
+                {
+                    var userJson = await response.Content.ReadAsStringAsync();
+                    currentUser = JsonSerializer.Deserialize<UserDTO>(userJson, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження користувача: {ex.Message}");
+            errorMessage = "Помилка автентифікації";
+        }
+    }
+
+    private async Task LoadVacancies()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            string endpoint = currentUser?.Role == 1 ? "api/vacancy/my" : "api/vacancy";
+            var response = await Http.GetAsync(endpoint);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var vacanciesJson = await response.Content.ReadAsStringAsync();
+                vacancies = JsonSerializer.Deserialize<List<VacancyDTO>>(vacanciesJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<VacancyDTO>();
+            }
+            else
+            {
+                errorMessage = "Помилка завантаження вакансій";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження вакансій: {ex.Message}");
+            errorMessage = "Помилка зв'язку з сервером";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAppliedVacancies()
+    {
+        if (currentUser?.Role != 2) return; // Only for workers
+
+        try
+        {
+            var response = await Http.GetAsync("api/resumevacancylink/my-applications");
+            if (response.IsSuccessStatusCode)
+            {
+                var applicationsJson = await response.Content.ReadAsStringAsync();
+                var applications = JsonSerializer.Deserialize<List<ResumeVacancyLinkDTO>>(applicationsJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<ResumeVacancyLinkDTO>();
+
+                appliedVacancies = applications.Select(a => a.VacancyId).ToHashSet();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження поданих заявок: {ex.Message}");
+        }
+    }
+
+    private async Task SearchVacancies()
+    {
+        if (string.IsNullOrWhiteSpace(searchKeyword))
+        {
+            await LoadVacancies();
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            var response = await Http.GetAsync($"api/vacancy/search?keyword={Uri.EscapeDataString(searchKeyword)}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var vacanciesJson = await response.Content.ReadAsStringAsync();
+                vacancies = JsonSerializer.Deserialize<List<VacancyDTO>>(vacanciesJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<VacancyDTO>();
+            }
+            else
+            {
+                errorMessage = "Помилка пошуку вакансій";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка пошуку: {ex.Message}");
+            errorMessage = "Помилка пошуку";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchVacancies();
+        }
+    }
+
+    private async Task RefreshVacancies()
+    {
+        searchKeyword = string.Empty;
+        await LoadVacancies();
+        await LoadAppliedVacancies();
+    }
+
+    private async Task ShowApplyModal(VacancyDTO vacancy)
+    {
+        selectedVacancy = vacancy;
+        selectedResumeId = 0;
+        showApplyModal = true;
+
+        // Load user resumes
+        try
+        {
+            var response = await Http.GetAsync("api/resume/my");
+            if (response.IsSuccessStatusCode)
+            {
+                var resumesJson = await response.Content.ReadAsStringAsync();
+                userResumes = JsonSerializer.Deserialize<List<ResumeDTO>>(resumesJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<ResumeDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження резюме: {ex.Message}");
+        }
+    }
+
+    private void CloseApplyModal()
+    {
+        showApplyModal = false;
+        selectedVacancy = null;
+        selectedResumeId = 0;
+        userResumes = null;
+    }
+
+    private void ViewVacancyDetails(VacancyDTO vacancy)
+    {
+        selectedVacancy = vacancy;
+        showDetailsModal = true;
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedVacancy = null;
+    }
+
+    private async Task ApplyToVacancy()
+    {
+        if (selectedVacancy == null || selectedResumeId <= 0) return;
+
+        try
+        {
+            isApplying = true;
+
+            var request = new
+            {
+                ResumeId = selectedResumeId,
+                VacancyId = selectedVacancy.Id
+            };
+
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await Http.PostAsync("api/resumevacancylink/apply", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                appliedVacancies.Add(selectedVacancy.Id);
+                CloseApplyModal();
+                await JSRuntime.InvokeVoidAsync("alert", "Ваша заявка успішно подана!");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("alert", $"Помилка подачі заявки: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка подачі заявки: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "Помилка зв'язку з сервером");
+        }
+        finally
+        {
+            isApplying = false;
+        }
+    }
+
+    private void NavigateToCreateVacancy()
+    {
+        Navigation.NavigateTo("/vacancies/create");
+    }
+
+    private void NavigateToCreateResume()
+    {
+        Navigation.NavigateTo("/resumes/create");
+    }
+
+    private void EditVacancy(int vacancyId)
+    {
+        Navigation.NavigateTo($"/vacancies/edit/{vacancyId}");
+    }
+
+    private async Task DeleteVacancy(int vacancyId)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити цю вакансію?"))
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/vacancy/{vacancyId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    await LoadVacancies(); // Оновлюємо список після видалення
+                }
+                else
+                {
+                    errorMessage = "Помилка видалення вакансії";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Помилка видалення вакансії: {ex.Message}");
+                errorMessage = "Помилка зв'язку з сервером";
+            }
+        }
+    }
+
+    // DTOs
+    public class UserDTO
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Role { get; set; }
+    }
+
+    public class VacancyDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Company { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Requirements { get; set; } = string.Empty;
+        public decimal Salary { get; set; }
+        public DateTime PostedAt { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class ResumeDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Experience { get; set; } = string.Empty;
+        public decimal ExpectedSalary { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class ResumeVacancyLinkDTO
+    {
+        public int Id { get; set; }
+        public int ResumeId { get; set; }
+        public int VacancyId { get; set; }
+        public string ResumeTitle { get; set; } = string.Empty;
+        public string VacancyTitle { get; set; } = string.Empty;
+        public DateTime SubmittedAt { get; set; }
+    }
+}

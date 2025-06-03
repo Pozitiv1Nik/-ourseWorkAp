@@ -7,14 +7,35 @@
 @using System.Net.Http.Headers
 @using BLL.DTO
 
-<PageTitle>Мої резюме</PageTitle>
+<PageTitle>@GetPageTitle()</PageTitle>
 
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-primary">Мої резюме</h2>
-        <button class="btn btn-primary" @onclick="NavigateToCreateResume">
-            <i class="bi bi-plus-circle"></i> Додати резюме
-        </button>
+        <h2 class="text-primary">@GetPageTitle()</h2>
+        @if (currentUser?.Role == 2) // Тільки працівники можуть додавати резюме
+        {
+            <button class="btn btn-primary" @onclick="NavigateToCreateResume">
+                <i class="bi bi-plus-circle"></i> Додати резюме
+            </button>
+        }
+        @if (currentUser?.Role == 1) // Роботодавці можуть шукати
+        {
+            <div class="d-flex gap-2">
+                <div class="input-group" style="width: 300px;">
+                    <input type="text" class="form-control" placeholder="Пошук резюме..."
+                           @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
+                    <button class="btn btn-outline-primary" @onclick="SearchResumes">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(searchKeyword))
+                {
+                    <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                }
+            </div>
+        }
     </div>
 
     @if (isLoading)
@@ -39,25 +60,67 @@
             <div class="mb-4">
                 <i class="bi bi-file-earmark-text" style="font-size: 4rem; color: #6c757d;"></i>
             </div>
-            <h4 class="text-muted mb-3">У вас ще немає резюме</h4>
-            <p class="text-muted mb-4">Створіть своє перше резюме, щоб почати пошук роботи</p>
-            <button class="btn btn-primary btn-lg" @onclick="NavigateToCreateResume">
-                <i class="bi bi-plus-circle"></i> Створити резюме
-            </button>
+            @if (currentUser?.Role == 2)
+            {
+                <h4 class="text-muted mb-3">У вас ще немає резюме</h4>
+                <p class="text-muted mb-4">Створіть своє перше резюме, щоб почати пошук роботи</p>
+                <button class="btn btn-primary btn-lg" @onclick="NavigateToCreateResume">
+                    <i class="bi bi-plus-circle"></i> Створити резюме
+                </button>
+            }
+            else if (currentUser?.Role == 1)
+            {
+                <h4 class="text-muted mb-3">Резюме не знайдено</h4>
+                <p class="text-muted mb-4">
+                    @if (!string.IsNullOrEmpty(searchKeyword))
+                    {
+                        <span>За запитом "@searchKeyword" резюме не знайдено. Спробуйте інший пошук.</span>
+                    }
+                    else
+                    {
+                        <span>На даний момент немає доступних резюме.</span>
+                    }
+                </p>
+                @if (!string.IsNullOrEmpty(searchKeyword))
+                {
+                    <button class="btn btn-outline-primary" @onclick="ClearSearch">
+                        <i class="bi bi-arrow-left"></i> Показати всі резюме
+                    </button>
+                }
+            }
+            else
+            {
+                <h4 class="text-muted mb-3">Резюме не знайдено</h4>
+                <p class="text-muted">Немає доступних резюме для перегляду.</p>
+            }
         </div>
     }
     else
     {
+        @if (currentUser?.Role == 1 && !string.IsNullOrEmpty(searchKeyword))
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Знайдено @resumes.Count резюме за запитом "@searchKeyword"
+            </div>
+        }
+
         <div class="row">
             @foreach (var resume in resumes)
             {
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100 shadow-sm border-0">
-                        <div class="card-header bg-primary text-white">
+                        <div class="card-header @GetCardHeaderClass() text-white">
                             <h5 class="card-title mb-0">
                                 <i class="bi bi-file-earmark-person"></i>
                                 @resume.Title
                             </h5>
+                            @if (currentUser?.Role == 1)
+                            {
+                                <small class="opacity-75">
+                                    <i class="bi bi-person"></i> ID: @resume.UserId
+                                </small>
+                            }
                         </div>
                         <div class="card-body d-flex flex-column">
                             <p class="card-text text-muted mb-3">
@@ -87,16 +150,47 @@
                                     </span>
                                 </div>
                             }
+
+                            @if (currentUser?.Role == 1)
+                            {
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <i class="bi bi-calendar3"></i> Оновлено: @DateTime.Now.ToString("dd.MM.yyyy")
+                                    </small>
+                                </div>
+                            }
                         </div>
                         <div class="card-footer bg-transparent border-0">
-                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
-                                    <i class="bi bi-pencil"></i> Редагувати
-                                </button>
-                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteResume(resume.Id)">
-                                    <i class="bi bi-trash"></i> Видалити
-                                </button>
-                            </div>
+                            @if (currentUser?.Role == 2) // Працівник - може редагувати та видаляти
+                            {
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
+                                        <i class="bi bi-pencil"></i> Редагувати
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteResume(resume.Id)">
+                                        <i class="bi bi-trash"></i> Видалити
+                                    </button>
+                                </div>
+                            }
+                            else if (currentUser?.Role == 1) // Роботодавець - може переглядати та пропонувати
+                            {
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success btn-sm" @onclick="() => OfferVacancy(resume.Id)">
+                                        <i class="bi bi-briefcase-fill"></i> Запропонувати вакансію
+                                    </button>
+                                </div>
+                            }
+                            else if (currentUser?.Role == 0) // Адміністратор - може все
+                            {
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
+                                        <i class="bi bi-pencil"></i> Редагувати
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteResume(resume.Id)">
+                                        <i class="bi bi-trash"></i> Видалити
+                                    </button>
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -106,8 +200,10 @@
         <div class="mt-4 p-3 bg-light rounded">
             <div class="row align-items-center">
                 <div class="col-md-8">
-                    <h6 class="mb-1">Загалом резюме: <span class="badge bg-primary">@resumes.Count</span></h6>
-                    <small class="text-muted">Підтримуйте свої резюме в актуальному стані для кращих результатів пошуку</small>
+                    <h6 class="mb-1">
+                        @GetStatsTitle(): <span class="badge @GetStatsBadgeClass()">@resumes.Count</span>
+                    </h6>
+                    <small class="text-muted">@GetStatsDescription()</small>
                 </div>
                 <div class="col-md-4 text-md-end">
                     <button class="btn btn-outline-primary" @onclick="RefreshResumes">
@@ -125,11 +221,67 @@
     </div>
 </div>
 
+<!-- Modal для пропозиції вакансії -->
+@if (showOfferModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Запропонувати вакансію</h5>
+                    <button type="button" class="btn-close" @onclick="CloseOfferModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (userVacancies == null || !userVacancies.Any())
+                    {
+                        <div class="text-center py-3">
+                            <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
+                            <p class="mt-2">У вас немає активних вакансій для пропозиції.</p>
+                            <a href="/vacancies/create" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Створити вакансію
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <p>Оберіть вакансію для пропозиції:</p>
+                        <div class="list-group">
+                            @foreach (var vacancy in userVacancies)
+                            {
+                                <button type="button" class="list-group-item list-group-item-action"
+                                        @onclick="() => SelectVacancyForOffer(vacancy.Id)">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">@vacancy.Title</h6>
+                                        @if (vacancy.Salary > 0)
+                                        {
+                                            <small class="text-success fw-bold">@vacancy.Salary.ToString("N0") грн</small>
+                                        }
+                                    </div>
+                                    <p class="mb-1 text-muted">
+                                        @(vacancy.Description.Length > 100 ? vacancy.Description.Substring(0, 100) + "..." : vacancy.Description)
+                                    </p>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseOfferModal">Скасувати</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<ResumeDTO>? resumes = null;
+    private List<VacancyDTO>? userVacancies = null;
     private bool isLoading = true;
     private string errorMessage = string.Empty;
     private UserDTO? currentUser = null;
+    private string searchKeyword = string.Empty;
+    private bool showOfferModal = false;
+    private int selectedResumeId = 0;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -182,7 +334,15 @@
             isLoading = true;
             errorMessage = string.Empty;
 
-            var response = await Http.GetAsync("api/resume/my");
+            string endpoint = currentUser.Role switch
+            {
+                2 => "api/resume/my", // Працівник - тільки свої резюме
+                1 => string.IsNullOrEmpty(searchKeyword) ? "api/resume" : $"api/resume/search?keyword={Uri.EscapeDataString(searchKeyword)}", // Роботодавець - всі резюме або пошук
+                0 => "api/resume", // Адміністратор - всі резюме
+                _ => "api/resume"
+            };
+
+            var response = await Http.GetAsync(endpoint);
             if (response.IsSuccessStatusCode)
             {
                 var resumesJson = await response.Content.ReadAsStringAsync();
@@ -207,9 +367,50 @@
         }
     }
 
+    private async Task LoadUserVacancies()
+    {
+        if (currentUser?.Role != 1) return;
+
+        try
+        {
+            var response = await Http.GetAsync("api/vacancy/my");
+            if (response.IsSuccessStatusCode)
+            {
+                var vacanciesJson = await response.Content.ReadAsStringAsync();
+                userVacancies = JsonSerializer.Deserialize<List<VacancyDTO>>(vacanciesJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<VacancyDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження вакансій: {ex.Message}");
+        }
+    }
+
     private async Task RefreshResumes()
     {
         await LoadResumes();
+    }
+
+    private async Task SearchResumes()
+    {
+        await LoadResumes();
+    }
+
+    private async Task ClearSearch()
+    {
+        searchKeyword = string.Empty;
+        await LoadResumes();
+    }
+
+    private async Task OnSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchResumes();
+        }
     }
 
     private void NavigateToCreateResume()
@@ -222,6 +423,44 @@
         Navigation.NavigateTo($"/resumes/edit/{resumeId}");
     }
 
+    private async Task OfferVacancy(int resumeId)
+    {
+        selectedResumeId = resumeId;
+        await LoadUserVacancies();
+        showOfferModal = true;
+    }
+
+    private void CloseOfferModal()
+    {
+        showOfferModal = false;
+        selectedResumeId = 0;
+    }
+
+    private async Task SelectVacancyForOffer(int vacancyId)
+    {
+        try
+        {
+            var request = new { VacancyId = vacancyId, ResumeId = selectedResumeId };
+            var response = await Http.PostAsJsonAsync("api/resumevacancylink/offer", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Вакансію успішно запропоновано!");
+                CloseOfferModal();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("alert", $"Помилка: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка пропозиції вакансії: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "Помилка зв'язку з сервером");
+        }
+    }
+
     private async Task DeleteResume(int resumeId)
     {
         if (await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити це резюме?"))
@@ -231,7 +470,7 @@
                 var response = await Http.DeleteAsync($"api/resume/{resumeId}");
                 if (response.IsSuccessStatusCode)
                 {
-                    await LoadResumes(); // Оновлюємо список після видалення
+                    await LoadResumes();
                 }
                 else
                 {
@@ -246,7 +485,63 @@
         }
     }
 
-    // DTOs (можна винести в окремий файл)
+    // Методи для динамічного контенту залежно від ролі
+    private string GetPageTitle()
+    {
+        return currentUser?.Role switch
+        {
+            2 => "Мої резюме",
+            1 => "Пошук резюме",
+            0 => "Всі резюме",
+            _ => "Резюме"
+        };
+    }
+
+    private string GetCardHeaderClass()
+    {
+        return currentUser?.Role switch
+        {
+            2 => "bg-primary",
+            1 => "bg-success",
+            0 => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatsTitle()
+    {
+        return currentUser?.Role switch
+        {
+            2 => "Мої резюме",
+            1 => "Знайдено резюме",
+            0 => "Загалом резюме",
+            _ => "Резюме"
+        };
+    }
+
+    private string GetStatsBadgeClass()
+    {
+        return currentUser?.Role switch
+        {
+            2 => "bg-primary",
+            1 => "bg-success",
+            0 => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatsDescription()
+    {
+        return currentUser?.Role switch
+        {
+            2 => "Підтримуйте свої резюме в актуальному стані для кращих результатів пошуку",
+            1 => "Переглядайте резюме кандидатів та пропонуйте їм свої вакансії",
+            0 => "Адміністрування всіх резюме в системі",
+            _ => "Перегляд резюме"
+        };
+    }
+
+    // DTOs
     public class UserDTO
     {
         public int Id { get; set; }
@@ -262,5 +557,14 @@
         public string Experience { get; set; } = string.Empty;
         public decimal ExpectedSalary { get; set; }
         public int UserId { get; set; }
+    }
+
+    public class VacancyDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public decimal Salary { get; set; }
+        public int EmployerId { get; set; }
     }
 }

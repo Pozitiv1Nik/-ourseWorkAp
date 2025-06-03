@@ -1,0 +1,434 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Net.Http.Headers
+
+<PageTitle>Job Portal - Головна</PageTitle>
+
+<div class="container py-4">
+    @if (currentUser != null)
+    {
+        <div class="welcome-section mb-4 p-4 bg-light rounded">
+            <h2 class="text-primary">Привіт, @currentUser.UserName! 👋</h2>
+            <p class="lead">Роль: <span class="badge bg-secondary">@GetRoleName(currentUser.Role)</span></p>
+        </div>
+
+        @if (currentUser.Role == 2) // Працівник (Worker)
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">Мої резюме</h4>
+                        </div>
+                        <div class="card-body">
+                            @if (resumes == null)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Завантаження...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (resumes.Count == 0)
+                            {
+                                <p class="text-muted">У вас ще немає резюме.</p>
+                            }
+                            else
+                            {
+                                @foreach (var resume in resumes)
+                                {
+                                    <div class="border-bottom pb-2 mb-2">
+                                        <h6>@resume.Title</h6>
+                                        <p class="text-muted small">@resume.Description</p>
+                                    </div>
+                                }
+                            }
+                            <button class="btn btn-primary mt-2" @onclick="NavigateToCreateResume">
+                                <i class="bi bi-plus-circle"></i> Створити резюме
+                            </button>
+                            <button class="btn btn-outline-primary mt-2 ms-2" @onclick="NavigateToMyResumes">
+                                <i class="bi bi-list"></i> Всі мої резюме
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">Доступні вакансії</h4>
+                        </div>
+                        <div class="card-body">
+                            @if (vacancies == null)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Завантаження...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (vacancies.Count == 0)
+                            {
+                                <p class="text-muted">Вакансій поки немає.</p>
+                            }
+                            else
+                            {
+                                @foreach (var vacancy in vacancies.Take(3))
+                                {
+                                    <div class="border-bottom pb-2 mb-2">
+                                        <h6>@vacancy.Title</h6>
+                                        <small class="text-muted">@vacancy.Company</small>
+                                        <p class="text-muted small">@(vacancy.Description.Length > 100 ? vacancy.Description.Substring(0, 100) + "..." : vacancy.Description)</p>
+                                    </div>
+                                }
+                            }
+                            <button class="btn btn-success mt-2" @onclick="NavigateToVacancies">
+                                <i class="bi bi-search"></i> Переглянути всі
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">Мої подачі</h4>
+                </div>
+                <div class="card-body">
+                    @if (applications == null)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Завантаження...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (applications.Count == 0)
+                    {
+                        <p class="text-muted">Ви ще не подавались на жодну вакансію.</p>
+                    }
+                    else
+                    {
+                        @foreach (var app in applications.Take(5))
+                        {
+                            <div class="border-bottom pb-2 mb-2">
+                                <h6>@app.VacancyTitle</h6>
+                                <small class="text-muted">Подано: @app.SubmittedAt.ToString("dd.MM.yyyy")</small>
+                            </div>
+                        }
+                    }
+                    <button class="btn btn-info mt-2" @onclick="NavigateToApplications">
+                        <i class="bi bi-clock-history"></i> Всі подачі
+                    </button>
+                </div>
+            </div>
+        }
+        else if (currentUser.Role == 1) // Роботодавець (Employer)
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">Мої вакансії</h4>
+                        </div>
+                        <div class="card-body">
+                            @if (vacancies == null)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Завантаження...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (vacancies.Count == 0)
+                            {
+                                <p class="text-muted">У вас ще немає вакансій.</p>
+                            }
+                            else
+                            {
+                                @foreach (var vacancy in vacancies)
+                                {
+                                    <div class="border-bottom pb-2 mb-2">
+                                        <h6>@vacancy.Title</h6>
+                                        <small class="text-muted">@vacancy.Company</small>
+                                        <p class="text-muted small">@vacancy.Description</p>
+                                    </div>
+                                }
+                            }
+                            <button class="btn btn-primary mt-2" @onclick="NavigateToCreateVacancy">
+                                <i class="bi bi-plus-circle"></i> Створити вакансію
+                            </button>
+                            <button class="btn btn-outline-primary mt-2 ms-2" @onclick="NavigateToMyVacancies">
+                                <i class="bi bi-list"></i> Всі мої вакансії
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">Доступні резюме</h4>
+                        </div>
+                        <div class="card-body">
+                            @if (resumes == null)
+                            {
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Завантаження...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (resumes.Count == 0)
+                            {
+                                <p class="text-muted">Резюме поки немає.</p>
+                            }
+                            else
+                            {
+                                @foreach (var resume in resumes.Take(3))
+                                {
+                                    <div class="border-bottom pb-2 mb-2">
+                                        <h6>@resume.Title</h6>
+                                        <p class="text-muted small">@(resume.Description.Length > 100 ? resume.Description.Substring(0, 100) + "..." : resume.Description)</p>
+                                    </div>
+                                }
+                            }
+                            <button class="btn btn-success mt-2" @onclick="NavigateToResumes">
+                                <i class="bi bi-search"></i> Переглянути всі
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">Отримані заявки</h4>
+                </div>
+                <div class="card-body">
+                    @if (receivedApplications == null)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Завантаження...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (receivedApplications.Count == 0)
+                    {
+                        <p class="text-muted">Поки немає заявок на ваші вакансії.</p>
+                    }
+                    else
+                    {
+                        @foreach (var app in receivedApplications.Take(5))
+                        {
+                            <div class="border-bottom pb-2 mb-2">
+                                <h6>@app.ResumeTitle → @app.VacancyTitle</h6>
+                                <small class="text-muted">Подано: @app.SubmittedAt.ToString("dd.MM.yyyy")</small>
+                            </div>
+                        }
+                    }
+                    <button class="btn btn-info mt-2" @onclick="NavigateToReceivedApplications">
+                        <i class="bi bi-inbox"></i> Всі заявки
+                    </button>
+                </div>
+            </div>
+        }
+        else // Адмін
+        {
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Користувачі</h5>
+                            <p class="card-text display-4">@(userStats?.TotalUsers ?? 0)</p>
+                            <button class="btn btn-primary" @onclick="NavigateToUsers">Управління</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Резюме</h5>
+                            <p class="card-text display-4">@(resumes?.Count ?? 0)</p>
+                            <button class="btn btn-success" @onclick="NavigateToResumes">Переглянути</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Вакансії</h5>
+                            <p class="card-text display-4">@(vacancies?.Count ?? 0)</p>
+                            <button class="btn btn-info" @onclick="NavigateToVacancies">Переглянути</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="text-center mt-4">
+            <button class="btn btn-outline-danger" @onclick="Logout">
+                <i class="bi bi-box-arrow-right"></i> Вийти
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="text-center">
+            <h1 class="display-4 mb-4">Job Portal</h1>
+            <p class="lead">Знайдіть роботу своєї мрії або найкращих кандидатів</p>
+            <div class="mt-4">
+                <a href="/auth" class="btn btn-primary btn-lg me-3">Увійти</a>
+                <a href="/auth" class="btn btn-outline-primary btn-lg">Реєстрація</a>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private UserDTO? currentUser = null;
+    private List<ResumeDTO>? resumes = null;
+    private List<VacancyDTO>? vacancies = null;
+    private List<ApplicationDTO>? applications = null;
+    private List<ApplicationDTO>? receivedApplications = null;
+    private UserStatsDTO? userStats = null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUser();
+            if (currentUser != null)
+            {
+                await LoadData();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await Http.GetAsync("api/auth/me");
+                if (response.IsSuccessStatusCode)
+                {
+                    var userJson = await response.Content.ReadAsStringAsync();
+                    currentUser = JsonSerializer.Deserialize<UserDTO>(userJson, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження користувача: {ex.Message}");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            if (currentUser?.Role == 0) // Worker
+            {
+                resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume/my");
+                vacancies = await Http.GetFromJsonAsync<List<VacancyDTO>>("api/vacancy");
+                applications = await Http.GetFromJsonAsync<List<ApplicationDTO>>("api/resumevacancylink/my-applications");
+            }
+            else if (currentUser?.Role == 1) // Employer
+            {
+                vacancies = await Http.GetFromJsonAsync<List<VacancyDTO>>("api/vacancy/my");
+                resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume");
+                receivedApplications = await Http.GetFromJsonAsync<List<ApplicationDTO>>("api/resumevacancylink/received-applications");
+            }
+            else if (currentUser?.Role == 2) // Admin
+            {
+                resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume");
+                vacancies = await Http.GetFromJsonAsync<List<VacancyDTO>>("api/vacancy");
+                userStats = await Http.GetFromJsonAsync<UserStatsDTO>("api/user/stats");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження даних: {ex.Message}");
+        }
+    }
+
+    // Navigation methods
+    private void NavigateToCreateResume() => Navigation.NavigateTo("/resumes/create");
+    private void NavigateToMyResumes() => Navigation.NavigateTo("/resumes");
+    private void NavigateToCreateVacancy() => Navigation.NavigateTo("/vacancies/create");
+    private void NavigateToMyVacancies() => Navigation.NavigateTo("/vacancies");
+    private void NavigateToVacancies() => Navigation.NavigateTo("/vacancies");
+    private void NavigateToResumes() => Navigation.NavigateTo("/resumes");
+    private void NavigateToApplications() => Navigation.NavigateTo("/applications");
+    private void NavigateToReceivedApplications() => Navigation.NavigateTo("/applications/received");
+    private void NavigateToUsers() => Navigation.NavigateTo("/admin/users");
+
+    private async Task Logout()
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user");
+        currentUser = null;
+        Navigation.NavigateTo("/auth", forceLoad: true);
+    }
+
+    private string GetRoleName(int role) => role switch
+    {
+        0 => "Працівник",
+        1 => "Роботодавець",
+        2 => "Адміністратор",
+        _ => "Невідомо"
+    };
+
+    // DTOs
+    public class UserDTO
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Role { get; set; }
+    }
+
+    public class ResumeDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+
+    public class VacancyDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Company { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+
+    public class ApplicationDTO
+    {
+        public int Id { get; set; }
+        public string ResumeTitle { get; set; } = string.Empty;
+        public string VacancyTitle { get; set; } = string.Empty;
+        public DateTime SubmittedAt { get; set; }
+    }
+
+    public class UserStatsDTO
+    {
+        public int TotalUsers { get; set; }
+        public int AdminCount { get; set; }
+        public int EmployerCount { get; set; }
+        public int WorkerCount { get; set; }
+    }
+}

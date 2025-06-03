@@ -1,0 +1,266 @@
+﻿@page "/resumes"
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using BLL.DTO
+
+<PageTitle>Мої резюме</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary">Мої резюме</h2>
+        <button class="btn btn-primary" @onclick="NavigateToCreateResume">
+            <i class="bi bi-plus-circle"></i> Додати резюме
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Завантаження...</span>
+            </div>
+            <p class="mt-3 text-muted">Завантаження резюме...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            @errorMessage
+        </div>
+    }
+    else if (resumes == null || !resumes.Any())
+    {
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="bi bi-file-earmark-text" style="font-size: 4rem; color: #6c757d;"></i>
+            </div>
+            <h4 class="text-muted mb-3">У вас ще немає резюме</h4>
+            <p class="text-muted mb-4">Створіть своє перше резюме, щоб почати пошук роботи</p>
+            <button class="btn btn-primary btn-lg" @onclick="NavigateToCreateResume">
+                <i class="bi bi-plus-circle"></i> Створити резюме
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var resume in resumes)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-file-earmark-person"></i>
+                                @resume.Title
+                            </h5>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <p class="card-text text-muted mb-3">
+                                @(resume.Description.Length > 120 ? resume.Description.Substring(0, 120) + "..." : resume.Description)
+                            </p>
+
+                            @if (!string.IsNullOrEmpty(resume.Experience))
+                            {
+                                <div class="mb-3">
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-briefcase"></i> Досвід:
+                                    </small>
+                                    <span class="badge bg-light text-dark">
+                                        @(resume.Experience.Length > 50 ? resume.Experience.Substring(0, 50) + "..." : resume.Experience)
+                                    </span>
+                                </div>
+                            }
+
+                            @if (resume.ExpectedSalary > 0)
+                            {
+                                <div class="mb-auto">
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-currency-dollar"></i> Очікувана зарплата:
+                                    </small>
+                                    <span class="fw-bold text-success">
+                                        @resume.ExpectedSalary.ToString("N0") грн
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-footer bg-transparent border-0">
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
+                                    <i class="bi bi-pencil"></i> Редагувати
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteResume(resume.Id)">
+                                    <i class="bi bi-trash"></i> Видалити
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="mt-4 p-3 bg-light rounded">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="mb-1">Загалом резюме: <span class="badge bg-primary">@resumes.Count</span></h6>
+                    <small class="text-muted">Підтримуйте свої резюме в актуальному стані для кращих результатів пошуку</small>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <button class="btn btn-outline-primary" @onclick="RefreshResumes">
+                        <i class="bi bi-arrow-clockwise"></i> Оновити
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад на головну
+        </a>
+    </div>
+</div>
+
+@code {
+    private List<ResumeDTO>? resumes = null;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private UserDTO? currentUser = null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUser();
+            if (currentUser != null)
+            {
+                await LoadResumes();
+            }
+            else
+            {
+                Navigation.NavigateTo("/auth");
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await Http.GetAsync("api/auth/me");
+                if (response.IsSuccessStatusCode)
+                {
+                    var userJson = await response.Content.ReadAsStringAsync();
+                    currentUser = JsonSerializer.Deserialize<UserDTO>(userJson, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження користувача: {ex.Message}");
+            errorMessage = "Помилка автентифікації";
+        }
+    }
+
+    private async Task LoadResumes()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            var response = await Http.GetAsync("api/resume/my");
+            if (response.IsSuccessStatusCode)
+            {
+                var resumesJson = await response.Content.ReadAsStringAsync();
+                resumes = JsonSerializer.Deserialize<List<ResumeDTO>>(resumesJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<ResumeDTO>();
+            }
+            else
+            {
+                errorMessage = "Помилка завантаження резюме";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження резюме: {ex.Message}");
+            errorMessage = "Помилка зв'язку з сервером";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshResumes()
+    {
+        await LoadResumes();
+    }
+
+    private void NavigateToCreateResume()
+    {
+        Navigation.NavigateTo("/resumes/create");
+    }
+
+    private void EditResume(int resumeId)
+    {
+        Navigation.NavigateTo($"/resumes/edit/{resumeId}");
+    }
+
+    private async Task DeleteResume(int resumeId)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити це резюме?"))
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/resume/{resumeId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    await LoadResumes(); // Оновлюємо список після видалення
+                }
+                else
+                {
+                    errorMessage = "Помилка видалення резюме";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Помилка видалення резюме: {ex.Message}");
+                errorMessage = "Помилка зв'язку з сервером";
+            }
+        }
+    }
+
+    // DTOs (можна винести в окремий файл)
+    public class UserDTO
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Role { get; set; }
+    }
+
+    public class ResumeDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Experience { get; set; } = string.Empty;
+        public decimal ExpectedSalary { get; set; }
+        public int UserId { get; set; }
+    }
+}

@@ -1,0 +1,17 @@
+﻿<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Components.Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Сторінка не знайдена</PageTitle>
+        <LayoutView Layout="@typeof(Components.Layout.MainLayout)">
+            <div class="container mt-5 text-center">
+                <h1 class="display-1">404</h1>
+                <h2>Сторінка не знайдена</h2>
+                <p class="lead">Вибачте, але сторінка, яку ви шукаете, не існує.</p>
+                <a href="/" class="btn btn-primary">Повернутися на головну</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

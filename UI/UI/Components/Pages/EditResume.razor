@@ -1,0 +1,367 @@
+﻿@page "/resumes/edit/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Text
+@using System.Net.Http.Headers
+@using System.ComponentModel.DataAnnotations
+@using BLL.DTO
+
+<PageTitle>Редагувати резюме</PageTitle>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0">
+                        <i class="bi bi-pencil"></i> Редагувати резюме
+                    </h3>
+                </div>
+                <div class="card-body">
+                    @if (!isInitialized || isLoadingResume)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Завантаження...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Завантаження даних резюме...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(loadErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            @loadErrorMessage
+                        </div>
+                        <div class="text-center">
+                            <button type="button" class="btn btn-primary" @onclick="GoBack">
+                                <i class="bi bi-arrow-left"></i> Повернутися назад
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <EditForm Model="resume" OnValidSubmit="HandleValidSubmit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Назва позиції <span class="text-danger">*</span></label>
+                                <InputText id="title" class="form-control" @bind-Value="resume.Title" placeholder="Наприклад: Frontend Developer" />
+                                <ValidationMessage For="@(() => resume.Title)" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Опис <span class="text-danger">*</span></label>
+                                <InputTextArea id="description" class="form-control" rows="6" @bind-Value="resume.Description"
+                                               placeholder="Розкажіть про свій досвід, навички та досягнення..." />
+                                <ValidationMessage For="@(() => resume.Description)" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="experience" class="form-label">Досвід роботи</label>
+                                <InputTextArea id="experience" class="form-control" rows="4" @bind-Value="resume.Experience"
+                                               placeholder="Опишіть ваш попередній досвід роботи..." />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="salary" class="form-label">Очікувана зарплата (грн)</label>
+                                <InputNumber id="salary" class="form-control" @bind-Value="resume.ExpectedSalary" />
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert alert-danger">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    @errorMessage
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(successMessage))
+                            {
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle"></i>
+                                    @successMessage
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-secondary" @onclick="GoBack">
+                                    <i class="bi bi-arrow-left"></i> Назад
+                                </button>
+                                <div>
+                                    <button type="button" class="btn btn-outline-danger me-2" @onclick="DeleteResume" disabled="@isSubmitting">
+                                        <i class="bi bi-trash"></i> Видалити
+                                    </button>
+                                    <button type="submit" class="btn btn-warning" disabled="@isSubmitting">
+                                        @if (isSubmitting)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        <i class="bi bi-save"></i> Зберегти зміни
+                                    </button>
+                                </div>
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EditResumeModel resume = new();
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string loadErrorMessage = string.Empty;
+    private bool isSubmitting = false;
+    private bool isInitialized = false;
+    private bool isLoadingResume = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    Navigation.NavigateTo("/auth");
+                    return;
+                }
+
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                isInitialized = true;
+                await LoadResume();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing: {ex.Message}");
+                Navigation.NavigateTo("/auth");
+            }
+        }
+    }
+
+    private async Task LoadResume()
+    {
+        try
+        {
+            isLoadingResume = true;
+            loadErrorMessage = string.Empty;
+
+            var response = await Http.GetAsync($"api/resume/{Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var resumeJson = await response.Content.ReadAsStringAsync();
+                var resumeDto = JsonSerializer.Deserialize<ResumeDTO>(resumeJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                if (resumeDto != null)
+                {
+                    resume = new EditResumeModel
+                        {
+                            Id = resumeDto.Id,
+                            Title = resumeDto.Title ?? string.Empty,
+                            Description = resumeDto.Description ?? string.Empty,
+                            Experience = resumeDto.Experience ?? string.Empty,
+                            ExpectedSalary = resumeDto.ExpectedSalary
+                        };
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                loadErrorMessage = "Резюме не знайдено";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                loadErrorMessage = "У вас немає прав для редагування цього резюме";
+            }
+            else
+            {
+                loadErrorMessage = $"Помилка завантаження резюме: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading resume: {ex.Message}");
+            loadErrorMessage = "Помилка зв'язку з сервером";
+        }
+        finally
+        {
+            isLoadingResume = false;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            // Створюємо об'єкт, який точно відповідає ResumeDTO
+            // НЕ встановлюємо UserId - сервер сам його визначить
+            var updateModel = new ResumeDTO
+                {
+                    Id = resume.Id,
+                    Title = resume.Title?.Trim() ?? string.Empty,
+                    Description = resume.Description?.Trim() ?? string.Empty,
+                    Experience = resume.Experience?.Trim() ?? string.Empty,
+                    ExpectedSalary = resume.ExpectedSalary ?? 0m
+                    // UserId НЕ встановлюємо - буде встановлений на сервері
+                };
+
+            // Додаткова валідація перед відправкою
+            if (string.IsNullOrWhiteSpace(updateModel.Title))
+            {
+                errorMessage = "Назва позиції обов'язкова";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(updateModel.Description))
+            {
+                errorMessage = "Опис резюме обов'язковий";
+                return;
+            }
+
+            if (updateModel.Title.Length > 200)
+            {
+                errorMessage = "Назва позиції не може бути довшою за 200 символів";
+                return;
+            }
+
+            if (updateModel.Description.Length > 2000)
+            {
+                errorMessage = "Опис не може бути довшим за 2000 символів";
+                return;
+            }
+
+            var json = JsonSerializer.Serialize(updateModel, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"Sending JSON: {json}"); // Для відладки
+
+            var response = await Http.PutAsync($"api/resume/{Id}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Резюме успішно оновлено!";
+                await Task.Delay(1500);
+                Navigation.NavigateTo("/resumes");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error response: {errorContent}"); // Для відладки
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    errorMessage = "Резюме не знайдено";
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    errorMessage = "У вас немає прав для редагування цього резюме";
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    errorMessage = $"Некоректні дані: {errorContent}";
+                }
+                else
+                {
+                    errorMessage = $"Помилка сервера: {response.StatusCode}. Спробуйте пізніше.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in HandleValidSubmit: {ex}");
+            errorMessage = $"Сталася помилка: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task DeleteResume()
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити це резюме? Цю дію неможливо скасувати."))
+        {
+            try
+            {
+                isSubmitting = true;
+                var response = await Http.DeleteAsync($"api/resume/{Id}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Резюме успішно видалено!");
+                    Navigation.NavigateTo("/resumes");
+                }
+                else
+                {
+                    errorMessage = "Помилка видалення резюме";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting resume: {ex.Message}");
+                errorMessage = "Помилка зв'язку з сервером";
+            }
+            finally
+            {
+                isSubmitting = false;
+            }
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/resumes");
+    }
+
+    // Спрощена модель, яка відповідає ResumeDTO
+    public class EditResumeModel
+    {
+        public int Id { get; set; }
+
+        [Required(ErrorMessage = "Назва позиції обов'язкова")]
+        [StringLength(200, ErrorMessage = "Назва позиції не може бути довшою за 200 символів")]
+        public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Опис обов'язковий")]
+        [StringLength(2000, ErrorMessage = "Опис не може бути довшим за 2000 символів")]
+        public string Description { get; set; } = string.Empty;
+
+        [StringLength(1000, ErrorMessage = "Досвід роботи не може бути довшим за 1000 символів")]
+        public string Experience { get; set; } = string.Empty;
+
+        [Range(0, 1000000, ErrorMessage = "Зарплата має бути від 0 до 1,000,000")]
+        public decimal? ExpectedSalary { get; set; }
+    }
+
+    // Дублікат ResumeDTO для використання у компоненті
+    public class ResumeDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Experience { get; set; } = string.Empty;
+        public decimal ExpectedSalary { get; set; }
+        public int UserId { get; set; }
+    }
+}

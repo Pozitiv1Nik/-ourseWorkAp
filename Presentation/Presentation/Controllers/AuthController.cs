@@ -140,7 +140,7 @@ namespace Presentation.Controllers
 
         private string GenerateJwtToken(UserDTO user)
         {
-            var key = Encoding.UTF8.GetBytes("your_super_secret_key_123456"); // Same key as in Program.cs
+            var key = Encoding.UTF8.GetBytes("your_super_secret_key_12345657891234ksknjnsdfksjdfksdksjdkug"); // Same key as in Program.cs
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]

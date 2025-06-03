@@ -3,6 +3,7 @@ using BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace Presentation.Controllers
 {
@@ -13,11 +14,13 @@ namespace Presentation.Controllers
     {
         private readonly IResumeService _resumeService;
         private readonly IUserService _userService;
+        private readonly ILogger<ResumeController> _logger;
 
-        public ResumeController(IResumeService resumeService, IUserService userService)
+        public ResumeController(IResumeService resumeService, IUserService userService, ILogger<ResumeController> logger)
         {
             _resumeService = resumeService;
             _userService = userService;
+            _logger = logger;
         }
 
         private async Task<UserDTO> GetCurrentUserAsync()
@@ -42,6 +45,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error getting all resumes");
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
@@ -66,6 +70,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error getting resume by id: {ResumeId}", id);
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
@@ -96,6 +101,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error creating resume");
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
@@ -106,32 +112,68 @@ namespace Presentation.Controllers
         {
             try
             {
+                _logger.LogInformation("Updating resume {ResumeId} with data: {@ResumeData}", id, dto);
+
                 if (!ModelState.IsValid)
                 {
+                    _logger.LogWarning("ModelState is invalid: {Errors}",
+                        string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
                     return BadRequest(ModelState);
                 }
 
                 if (string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Description))
                 {
+                    _logger.LogWarning("Title or Description is empty");
                     return BadRequest("Title and description are required.");
                 }
 
                 var user = await GetCurrentUserAsync();
+                if (user == null)
+                {
+                    _logger.LogWarning("User not found");
+                    return Unauthorized("User not found");
+                }
+
+                _logger.LogInformation("Current user: {UserId}, {Username}", user.Id, user.UserName);
+
+                // Встановлюємо правильний ID
                 dto.Id = id;
+                // НЕ встановлюємо UserId тут - це має робити сервіс
+
                 await _resumeService.UpdateResumeAsync(dto, user);
                 return Ok(new { message = "Resume updated successfully" });
             }
-            catch (KeyNotFoundException)
+            catch (KeyNotFoundException ex)
             {
+                _logger.LogWarning(ex, "Resume not found: {ResumeId}", id);
                 return NotFound("Resume not found.");
             }
             catch (UnauthorizedAccessException ex)
             {
+                _logger.LogWarning(ex, "Unauthorized access to resume: {ResumeId}", id);
                 return Forbid(ex.Message);
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error updating resume {ResumeId}. Inner exception: {InnerException}",
+                    id, ex.InnerException?.Message);
+
+                return StatusCode(500, new
+                {
+                    message = "Database error occurred",
+                    error = ex.InnerException?.Message ?? ex.Message,
+                    details = "Check database constraints and field lengths"
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred", error = ex.Message });
+                _logger.LogError(ex, "Unexpected error updating resume {ResumeId}", id);
+                return StatusCode(500, new
+                {
+                    message = "An unexpected error occurred",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
             }
         }
 
@@ -155,6 +197,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error deleting resume {ResumeId}", id);
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
@@ -177,6 +220,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error getting user's resumes");
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }
@@ -215,6 +259,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error searching resumes");
                 return StatusCode(500, new { message = "An error occurred", error = ex.Message });
             }
         }

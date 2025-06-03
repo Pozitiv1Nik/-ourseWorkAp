@@ -3,6 +3,7 @@ using BLL.DTO;
 using BLL.Interfaces;
 using DAL;
 using Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,21 +71,26 @@ namespace BLL.Services
 			await _unitOfWork.CompleteAsync();
 		}
 
-		public async Task UpdateResumeAsync(ResumeDTO resumeDTO, UserDTO requester)
-		{
-			var existing = await _unitOfWork.Resumes.GetByIdAsync(resumeDTO.Id);
-			if (existing == null)
-				throw new KeyNotFoundException("Resume not found");
+        public async Task UpdateResumeAsync(ResumeDTO dto, UserDTO user)
+        {
+            // Find existing resume by ID
+            var existingResume = await _unitOfWork.Resumes.GetByIdAsync(dto.Id);
 
-			if (requester.Role != UserRole.Worker || existing.UserId != requester.Id)
-				throw new UnauthorizedAccessException("Only the owner can update the resume.");
+            // Check if resume exists and belongs to the user
+            if (existingResume == null || existingResume.UserId != user.Id)
+                throw new KeyNotFoundException("Resume not found or access denied");
 
-			_mapper.Map(resumeDTO, existing);
-			_unitOfWork.Resumes.Update(existing);
-			await _unitOfWork.CompleteAsync();
-		}
+            // Update only the necessary fields, DO NOT change UserId and Id
+            existingResume.Title = dto.Title;
+            existingResume.Description = dto.Description;
+            existingResume.Experience = dto.Experience;
+            existingResume.ExpectedSalary = dto.ExpectedSalary;
 
-		public async Task DeleteResumeAsync(int id, UserDTO requester)
+            // Save changes using the correct UnitOfWork method
+            await _unitOfWork.CompleteAsync();
+        }
+
+        public async Task DeleteResumeAsync(int id, UserDTO requester)
 		{
 			var resume = await _unitOfWork.Resumes.GetByIdAsync(id);
 			if (resume == null)

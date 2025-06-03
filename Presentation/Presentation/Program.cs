@@ -48,7 +48,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<ApDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 // JWT Auth
-var key = Encoding.UTF8.GetBytes("your_super_secret_key_123456"); // заміни на свій ключ!
+var key = Encoding.UTF8.GetBytes("your_super_secret_key_12345657891234ksknjnsdfksjdfksdksjdkug"); // заміни на свій ключ!
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -186,8 +186,8 @@
                             else if (currentUser?.Role == 0) // Адміністратор - може все
                             {
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
-                                        <i class="bi bi-pencil"></i> Редагувати
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => NavigateToResume(resume.Id)">
+                                        <i class="bi bi-pencil"></i> Детальніше
                                     </button>
                                     <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteResume(resume.Id)">
                                         <i class="bi bi-trash"></i> Видалити

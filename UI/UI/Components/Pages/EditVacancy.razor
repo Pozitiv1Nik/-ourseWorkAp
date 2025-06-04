@@ -61,7 +61,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="requirements" class="form-label">Вимоги</label>
+                        <label for="requirements" class="form-label">Досвід</label>
                         <InputTextArea id="requirements" class="form-control" rows="3" @bind-Value="vacancy.Requirements" />
                         <ValidationMessage For="@(() => vacancy.Requirements)" />
                     </div>
@@ -212,7 +212,27 @@
             isSaving = true;
             errorMessage = string.Empty;
 
-            var response = await Http.PutAsJsonAsync($"api/vacancy/{VacancyId}", vacancy);
+            // Get and set the auth token
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                Navigation.NavigateTo("/auth");
+                return;
+            }
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Create the update model matching the server's expected format
+            var updateModel = new VacancyDTO
+            {
+                Id = VacancyId,
+                Title = vacancy.Title,
+                Description = vacancy.Description,
+                Experience = vacancy.Requirements,
+                ExpectedSalary = vacancy.Salary.ToString(),
+                UserId = currentUser.Id
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/vacancy/{VacancyId}", updateModel);
             if (response.IsSuccessStatusCode)
             {
                 await JSRuntime.InvokeVoidAsync("alert", "Вакансію успішно оновлено");
@@ -282,5 +302,15 @@
         [Required(ErrorMessage = "Зарплата обов'язкова")]
         [Range(0, 1000000, ErrorMessage = "Зарплата повинна бути в межах від 0 до 1,000,000")]
         public decimal Salary { get; set; }
+    }
+
+    public class VacancyDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Experience { get; set; } = string.Empty;
+        public string ExpectedSalary { get; set; } = string.Empty;
+        public int UserId { get; set; }
     }
 } 

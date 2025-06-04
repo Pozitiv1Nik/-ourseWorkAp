@@ -44,9 +44,12 @@
                 @if (CanEditVacancy())
                 {
                     <div>
-                        <button class="btn btn-light btn-sm me-2" @onclick="EditVacancy">
-                            <i class="bi bi-pencil"></i> Редагувати
-                        </button>
+                        @if (currentUser.Role == 1) 
+                        {
+                            <button class="btn btn-light btn-sm me-2" @onclick="EditVacancy">
+                                <i class="bi bi-pencil"></i> Редагувати
+                            </button>
+                        }
                         <button class="btn btn-danger btn-sm" @onclick="DeleteVacancy">
                             <i class="bi bi-trash"></i> Видалити
                         </button>
@@ -61,7 +64,7 @@
 
                         @if (!string.IsNullOrEmpty(vacancy.Requirements))
                         {
-                            <h5 class="card-title mt-4 mb-3">Вимоги</h5>
+                            <h5 class="card-title mt-4 mb-3">Досвід</h5>
                             <p class="card-text">@vacancy.Requirements</p>
                         }
                     </div>

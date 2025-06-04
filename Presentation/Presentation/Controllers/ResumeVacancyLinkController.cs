@@ -58,6 +58,31 @@ namespace Presentation.Controllers
             }
         }
 
+        // GET: api/resumevacancylink/all - для адмінів, всі заявки
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAllApplications()
+        {
+            try
+            {
+                var user = await GetCurrentUserAsync();
+                if (user.Role != 0) // Only admin
+                {
+                    return StatusCode(403, new { message = "Only administrators can view all applications" });
+                }
+
+                var links = await _linkService.GetAllLinksAsync(user);
+                return Ok(links);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred", error = ex.Message });
+            }
+        }
+
         // GET: api/resumevacancylink/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetLinkById(int id)
@@ -74,7 +99,7 @@ namespace Presentation.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -212,7 +237,7 @@ namespace Presentation.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
             {

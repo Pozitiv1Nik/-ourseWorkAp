@@ -23,7 +23,7 @@
             <div class="d-flex gap-2">
                 <div class="input-group" style="width: 300px;">
                     <input type="text" class="form-control" placeholder="Пошук резюме..."
-                           @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
+                    @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
                     <button class="btn btn-outline-primary" @onclick="SearchResumes">
                         <i class="bi bi-search"></i>
                     </button>
@@ -164,6 +164,9 @@
                             @if (currentUser?.Role == 2) // Працівник - може редагувати та видаляти
                             {
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => NavigateToResume(resume.Id)">
+                                        <i class="bi bi-pencil"></i> Детальніше
+                                    </button>
                                     <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditResume(resume.Id)">
                                         <i class="bi bi-pencil"></i> Редагувати
                                     </button>
@@ -249,7 +252,7 @@
                             @foreach (var vacancy in userVacancies)
                             {
                                 <button type="button" class="list-group-item list-group-item-action"
-                                        @onclick="() => SelectVacancyForOffer(vacancy.Id)">
+                                @onclick="() => SelectVacancyForOffer(vacancy.Id)">
                                     <div class="d-flex w-100 justify-content-between">
                                         <h6 class="mb-1">@vacancy.Title</h6>
                                         @if (vacancy.Salary > 0)
@@ -416,6 +419,11 @@
     private void NavigateToCreateResume()
     {
         Navigation.NavigateTo("/resumes/create");
+    }
+
+    private void NavigateToResume(int idResume)
+    {
+        Navigation.NavigateTo($"/resumes/{idResume}");
     }
 
     private void EditResume(int resumeId)

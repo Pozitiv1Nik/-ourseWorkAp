@@ -1,0 +1,373 @@
+@page "/vacancies/{Id:int}"
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@rendermode InteractiveServer
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using BLL.DTO
+
+<PageTitle>@(vacancy?.Title ?? "Вакансія")</PageTitle>
+
+<div class="container py-4">
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Завантаження...</span>
+            </div>
+            <p class="mt-3 text-muted">Завантаження вакансії...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            @errorMessage
+        </div>
+    }
+    else if (vacancy == null)
+    {
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="bi bi-briefcase" style="font-size: 4rem; color: #6c757d;"></i>
+            </div>
+            <h4 class="text-muted mb-3">Вакансію не знайдено</h4>
+            <p class="text-muted">Можливо, вона була видалена або у вас немає прав для її перегляду</p>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">@vacancy.Title</h3>
+                @if (CanEditVacancy())
+                {
+                    <div>
+                        <button class="btn btn-light btn-sm me-2" @onclick="EditVacancy">
+                            <i class="bi bi-pencil"></i> Редагувати
+                        </button>
+                        <button class="btn btn-danger btn-sm" @onclick="DeleteVacancy">
+                            <i class="bi bi-trash"></i> Видалити
+                        </button>
+                    </div>
+                }
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5 class="card-title mb-4">Опис</h5>
+                        <p class="card-text">@vacancy.Description</p>
+
+                        @if (!string.IsNullOrEmpty(vacancy.Requirements))
+                        {
+                            <h5 class="card-title mt-4 mb-3">Вимоги</h5>
+                            <p class="card-text">@vacancy.Requirements</p>
+                        }
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Зарплата</h6>
+                                <p class="card-text fs-4 text-success">@vacancy.Salary.ToString("N0") грн</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (applications != null && applications.Any())
+                {
+                    <div class="mt-4">
+                        <h5 class="card-title mb-3">Отримані заявки</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Резюме</th>
+                                        <th>Дата подачі</th>
+                                        @if (CanManageApplications())
+                                        {
+                                            <th>Дії</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var app in applications)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <a href="/resumes/@app.ResumeId" class="text-decoration-none">
+                                                    @app.ResumeTitle
+                                                </a>
+                                            </td>
+                                            <td>@app.SubmittedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                            @if (CanManageApplications())
+                                            {
+                                                <td>
+                                                    <button class="btn btn-danger btn-sm" @onclick="() => DeleteApplication(app.Id)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/vacancies" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад до списку вакансій
+        </a>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private VacancyDetailsDTO? vacancy;
+    private List<ResumeVacancyLinkDTO>? applications;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private UserDTO? currentUser;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUser();
+            if (currentUser != null)
+            {
+                await LoadVacancy();
+                await LoadApplications();
+            }
+            else
+            {
+                Navigation.NavigateTo("/auth");
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await Http.GetAsync("api/auth/me");
+                if (response.IsSuccessStatusCode)
+                {
+                    var userJson = await response.Content.ReadAsStringAsync();
+                    currentUser = JsonSerializer.Deserialize<UserDTO>(userJson, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження користувача: {ex.Message}");
+            errorMessage = "Помилка автентифікації";
+        }
+    }
+
+    private async Task LoadVacancy()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            var response = await Http.GetAsync($"api/vacancy/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                vacancy = JsonSerializer.Deserialize<VacancyDetailsDTO>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                vacancy = null;
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                errorMessage = "У вас немає прав для перегляду цієї вакансії";
+            }
+            else
+            {
+                errorMessage = "Помилка завантаження вакансії";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження вакансії: {ex.Message}");
+            errorMessage = "Помилка зв'язку з сервером";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadApplications()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/resumevacancylink/vacancy/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                applications = JsonSerializer.Deserialize<List<ResumeVacancyLinkDTO>>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження заявок: {ex.Message}");
+        }
+    }
+
+    private bool CanEditVacancy()
+    {
+        if (currentUser == null || vacancy == null) return false;
+        return currentUser.Role == 0 || // Admin
+               (currentUser.Role == 1 && vacancy.UserId == currentUser.Id); // Owner (Employer)
+    }
+
+    private bool CanManageApplications()
+    {
+        if (currentUser == null || vacancy == null) return false;
+        return currentUser.Role == 0 || // Admin
+               (currentUser.Role == 1 && vacancy.UserId == currentUser.Id); // Owner (Employer)
+    }
+
+    private void EditVacancy()
+    {
+        Navigation.NavigateTo($"/vacancies/edit/{Id}");
+    }
+
+    private async Task DeleteVacancy()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити цю вакансію?"))
+            return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/vacancy/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Вакансію успішно видалено");
+                Navigation.NavigateTo("/vacancies");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(errorContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    errorMessage = errorResponse?.Message ?? "Помилка видалення вакансії";
+                }
+                catch
+                {
+                    errorMessage = "Помилка видалення вакансії";
+                }
+                await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка видалення вакансії: {ex.Message}");
+            errorMessage = "Помилка зв'язку з сервером";
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+        }
+    }
+
+    private async Task DeleteApplication(int applicationId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Ви впевнені, що хочете видалити цю заявку?"))
+            return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/resumevacancylink/{applicationId}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadApplications();
+                await JSRuntime.InvokeVoidAsync("alert", "Заявку успішно видалено");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(errorContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    errorMessage = errorResponse?.Message ?? "Помилка видалення заявки";
+                }
+                catch
+                {
+                    errorMessage = "Помилка видалення заявки";
+                }
+                await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка видалення заявки: {ex.Message}");
+            errorMessage = "Помилка зв'язку з сервером";
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+        }
+    }
+
+    private class ErrorResponse
+    {
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class UserDTO
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Role { get; set; }
+    }
+
+    public class VacancyDetailsDTO
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Requirements { get; set; } = string.Empty;
+        public decimal Salary { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class ResumeVacancyLinkDTO
+    {
+        public int Id { get; set; }
+        public int ResumeId { get; set; }
+        public int VacancyId { get; set; }
+        public string ResumeTitle { get; set; } = string.Empty;
+        public string VacancyTitle { get; set; } = string.Empty;
+        public DateTime SubmittedAt { get; set; }
+    }
+} 

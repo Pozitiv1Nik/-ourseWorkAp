@@ -60,7 +60,7 @@
             <div class="col-md-8">
                 <div class="input-group">
                     <input type="text" class="form-control" placeholder="Пошук вакансій за ключовими словами..."
-                           @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
+                    @bind="searchKeyword" @onkeypress="OnSearchKeyPress" />
                     <button class="btn btn-outline-secondary" type="button" @onclick="SearchVacancies">
                         <i class="bi bi-search"></i> Пошук
                     </button>
@@ -121,7 +121,7 @@
                                 @if (currentUser?.Role == 2) // Worker
                                 {
                                     <button class="btn btn-primary" @onclick="() => ShowApplyModal(vacancy)"
-                                            disabled="@(appliedVacancies.Contains(vacancy.Id))">
+                                    disabled="@(appliedVacancies.Contains(vacancy.Id))">
                                         @if (appliedVacancies.Contains(vacancy.Id))
                                         {
                                             <i class="bi bi-check-circle"></i> <text>Вже подано</text>
@@ -229,7 +229,7 @@
                     @if (userResumes?.Any() == true)
                     {
                         <button type="button" class="btn btn-primary" @onclick="ApplyToVacancy"
-                                disabled="@(selectedResumeId <= 0 || isApplying)">
+                        disabled="@(selectedResumeId <= 0 || isApplying)">
                             @if (isApplying)
                             {
                                 <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -291,7 +291,7 @@
                     @if (currentUser?.Role == 2) // Worker
                     {
                         <button type="button" class="btn btn-primary" @onclick="() => { CloseDetailsModal(); ShowApplyModal(selectedVacancy); }"
-                                disabled="@(appliedVacancies.Contains(selectedVacancy.Id))">
+                        disabled="@(appliedVacancies.Contains(selectedVacancy.Id))">
                             @if (appliedVacancies.Contains(selectedVacancy.Id))
                             {
                                 <i class="bi bi-check-circle"></i> <text>Вже подано</text>
@@ -514,8 +514,7 @@
 
     private void ViewVacancyDetails(VacancyDTO vacancy)
     {
-        selectedVacancy = vacancy;
-        showDetailsModal = true;
+        Navigation.NavigateTo($"/vacancies/{vacancy.Id}");
     }
 
     private void CloseDetailsModal()

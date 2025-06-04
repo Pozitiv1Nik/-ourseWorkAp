@@ -1,4 +1,10 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using BLL.DTO
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">Пошук роботи</a>
     </div>
@@ -28,5 +34,55 @@
                 <span class="bi bi-file-person-fill" aria-hidden="true"></span> Резюме
             </NavLink>
         </div>
+        @if (currentUser != null)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="applications">
+                    <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span> Заявки
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
+
+@code {
+    private UserDTO? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUser();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await Http.GetAsync("api/auth/me");
+                if (response.IsSuccessStatusCode)
+                {
+                    var userJson = await response.Content.ReadAsStringAsync();
+                    currentUser = JsonSerializer.Deserialize<UserDTO>(userJson, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження користувача: {ex.Message}");
+        }
+    }
+
+    private class UserDTO
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Role { get; set; }
+    }
+}

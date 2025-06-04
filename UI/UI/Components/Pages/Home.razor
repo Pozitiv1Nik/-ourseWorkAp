@@ -232,7 +232,7 @@
                             </div>
                         }
                     }
-                    <button class="btn btn-info mt-2" @onclick="NavigateToReceivedApplications">
+                    <button class="btn btn-info mt-2" @onclick="NavigateToApplications">
                         <i class="bi bi-inbox"></i> Всі заявки
                     </button>
                 </div>
@@ -341,7 +341,7 @@
     {
         try
         {
-            if (currentUser?.Role == 0) // Worker
+            if (currentUser?.Role == 2) // Worker
             {
                 resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume/my");
                 vacancies = await Http.GetFromJsonAsync<List<VacancyDTO>>("api/vacancy");
@@ -353,7 +353,7 @@
                 resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume");
                 receivedApplications = await Http.GetFromJsonAsync<List<ApplicationDTO>>("api/resumevacancylink/received-applications");
             }
-            else if (currentUser?.Role == 2) // Admin
+            else if (currentUser?.Role == 0) // Admin
             {
                 resumes = await Http.GetFromJsonAsync<List<ResumeDTO>>("api/resume");
                 vacancies = await Http.GetFromJsonAsync<List<VacancyDTO>>("api/vacancy");
@@ -374,7 +374,6 @@
     private void NavigateToVacancies() => Navigation.NavigateTo("/vacancies");
     private void NavigateToResumes() => Navigation.NavigateTo("/resumes");
     private void NavigateToApplications() => Navigation.NavigateTo("/applications");
-    private void NavigateToReceivedApplications() => Navigation.NavigateTo("/applications/received");
     private void NavigateToUsers() => Navigation.NavigateTo("/admin/users");
 
     private async Task Logout()

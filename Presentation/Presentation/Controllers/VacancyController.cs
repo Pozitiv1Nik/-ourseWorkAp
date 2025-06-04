@@ -35,7 +35,7 @@ namespace Presentation.Controllers
 
             // Тільки адміни та працівники можуть переглядати всі вакансії
             if (user.Role != UserRole.Admin && user.Role != UserRole.Worker)
-                return Forbid();
+                return StatusCode(403, new { message = "Only administrators and workers can view all vacancies" });
 
             var vacancies = await _vacancyService.GetAllVacanciesAsync(user);
             return Ok(vacancies);
@@ -56,9 +56,9 @@ namespace Presentation.Controllers
             {
                 return NotFound();
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                return Forbid();
+                return StatusCode(403, new { message = ex.Message });
             }
         }
 
@@ -70,7 +70,7 @@ namespace Presentation.Controllers
 
             // Тільки роботодавці можуть створювати вакансії
             if (user.Role != UserRole.Employer)
-                return Forbid("Only employers can create vacancies");
+                return StatusCode(403, new { message = "Only employers can create vacancies" });
 
             try
             {
@@ -79,7 +79,7 @@ namespace Presentation.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
         }
 
@@ -101,7 +101,7 @@ namespace Presentation.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
         }
 
@@ -122,7 +122,7 @@ namespace Presentation.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
         }
 
@@ -134,7 +134,7 @@ namespace Presentation.Controllers
 
             // Тільки адміни та працівники можуть шукати вакансії
             if (user.Role != UserRole.Admin && user.Role != UserRole.Worker)
-                return Forbid();
+                return StatusCode(403, new { message = "Only administrators and workers can search vacancies" });
 
             var vacancies = await _vacancyService.SearchVacanciesAsync(keyword, user);
             return Ok(vacancies);
@@ -147,7 +147,7 @@ namespace Presentation.Controllers
             var user = await GetCurrentUserAsync();
 
             if (user.Role != UserRole.Employer)
-                return Forbid("Only employers can view their vacancies");
+                return StatusCode(403, new { message = "Only employers can view their vacancies" });
 
             var vacancies = await _vacancyService.GetVacanciesByEmployerAsync(user.Id);
             return Ok(vacancies);

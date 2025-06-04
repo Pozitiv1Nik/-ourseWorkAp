@@ -97,11 +97,15 @@ namespace BLL.Services
             if (vacancy == null)
                 throw new KeyNotFoundException("Vacancy not found");
 
-            if (requester.Role != UserRole.Employer || vacancy.UserId != requester.Id)
-                throw new UnauthorizedAccessException("Only the owner can delete the vacancy.");
-
-            _unitOfWork.Vacancies.Remove(vacancy);
-            await _unitOfWork.CompleteAsync();
+            if (requester.Role == 0 || (requester.Role == UserRole.Employer && requester.Id == vacancy.UserId))
+            {
+                _unitOfWork.Vacancies.Remove(vacancy);
+                await _unitOfWork.CompleteAsync();
+            }
+            else 
+            { 
+                throw new UnauthorizedAccessException("Only the owner or administrator can delete the vacancy."); 
+            }
         }
 
         public async Task<IEnumerable<VacancyDTO>> SearchVacanciesAsync(string keyword, UserDTO requester)

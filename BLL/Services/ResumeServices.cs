@@ -96,11 +96,15 @@ namespace BLL.Services
 			if (resume == null)
 				throw new KeyNotFoundException("Resume not found");
 
-			if (requester.Role != UserRole.Worker || resume.UserId != requester.Id)
+			if ((requester.Role == UserRole.Worker && requester.Id == resume.UserId) || requester.Role == UserRole.Admin)
+			{
+                _unitOfWork.Resumes.Remove(resume);
+                await _unitOfWork.CompleteAsync();
+            }
+			else 
+			{ 
 				throw new UnauthorizedAccessException("Only the owner can delete the resume.");
-
-			_unitOfWork.Resumes.Remove(resume);
-			await _unitOfWork.CompleteAsync();
+			}
 		}
 	}
 }

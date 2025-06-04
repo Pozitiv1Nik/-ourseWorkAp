@@ -143,6 +143,12 @@
                                         </button>
                                     </div>
                                 }
+                                else if (currentUser?.Role == 0) // Admin
+                                {
+                                    <button class="btn btn-outline-danger btn-sm w-100" @onclick="() => DeleteVacancy(vacancy.Id)">
+                                        <i class="bi bi-trash"></i> Видалити вакансію
+                                    </button>
+                                }
                                 <button class="btn btn-outline-info btn-sm" @onclick="() => ViewVacancyDetails(vacancy)">
                                     <i class="bi bi-eye"></i> Детальніше
                                 </button>
@@ -585,18 +591,38 @@
                 if (response.IsSuccessStatusCode)
                 {
                     await LoadVacancies(); // Оновлюємо список після видалення
+                    await JSRuntime.InvokeVoidAsync("alert", "Вакансію успішно видалено");
                 }
                 else
                 {
-                    errorMessage = "Помилка видалення вакансії";
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(errorContent, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                        errorMessage = errorResponse?.Message ?? "Помилка видалення вакансії";
+                    }
+                    catch
+                    {
+                        errorMessage = "Помилка видалення вакансії";
+                    }
+                    await JSRuntime.InvokeVoidAsync("alert", errorMessage);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Помилка видалення вакансії: {ex.Message}");
                 errorMessage = "Помилка зв'язку з сервером";
+                await JSRuntime.InvokeVoidAsync("alert", errorMessage);
             }
         }
+    }
+
+    private class ErrorResponse
+    {
+        public string Message { get; set; } = string.Empty;
     }
 
     // DTOs
